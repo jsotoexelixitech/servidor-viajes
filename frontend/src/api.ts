@@ -136,12 +136,14 @@ export const viajeApi = {
 };
 
 export const adminApi = {
-  crear:          (data: { nombre: string; webhookUrl?: string; webhookSecret?: string }) => api.post('/admin/tenants', data),
-  listar:         () => api.get('/admin/tenants'),
-  /**
-   * Solo para admin: muestra pólizas críticas de TODOS los tenants.
-   * Requiere X-Admin-Key en el header; no usa el session token de cliente.
-   */
+  crear: (data: { nombre: string; webhookUrl?: string; webhookSecret?: string }, adminKey: string) =>
+    axios.post(`${BASE_URL}/admin/tenants`, data, {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
+  listar: (adminKey: string) =>
+    axios.get(`${BASE_URL}/admin/tenants`, {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
   polizasCriticasAdmin: (adminKey: string) =>
     axios.get(`${BASE_URL}/admin/tenants/polizas-criticas`, {
       headers: { 'X-Admin-Key': adminKey },

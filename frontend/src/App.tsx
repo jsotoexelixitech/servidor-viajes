@@ -35,6 +35,7 @@ const Ic = {
   info:     (p?: string) => <svg className={p ?? 'w-4 h-4'} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7.5" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor"/></svg>,
   arrow:    (p?: string) => <svg className={p ?? 'w-3.5 h-3.5'} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h8M8 4l3 3-3 3"/></svg>,
   eye:      (p?: string) => <svg className={p ?? 'w-3.5 h-3.5'} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 8s2.5-5 6.5-5 6.5 5 6.5 5-2.5 5-6.5 5-6.5-5-6.5-5z"/><circle cx="8" cy="8" r="2"/></svg>,
+  eyeOff:   (p?: string) => <svg className={p ?? 'w-3.5 h-3.5'} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 2l12 12M6.5 6.6A2 2 0 0 0 9.4 9.5M4.1 4.2A6.5 6.5 0 0 0 1.5 8s2.5 5 6.5 5a6.4 6.4 0 0 0 3.9-1.3M6 2.3A6.4 6.4 0 0 1 8 2c4 0 6.5 5 6.5 5a11.6 11.6 0 0 1-1.5 2.3"/></svg>,
   link:     (p?: string) => <svg className={p ?? 'w-3 h-3'} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 2H3a2 2 0 0 0 0 4h2M7 10h2a2 2 0 0 0 0-4H7M4 6h4"/></svg>,
   chevron:  (p?: string) => <svg className={p ?? 'w-3.5 h-3.5'} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 3 4 4-4 4"/></svg>,
 };
@@ -261,9 +262,11 @@ export default function App() {
   const [reqStatus,  setReqStatus] = useState<ReqStatus>('idle');
 
   // Setup
-  const [tenantNombre, setTenantNombre] = useState('');
-  const [tenantWebhook, setTenantWebhook] = useState('');
-  const [tenantSecret,  setTenantSecret]  = useState('');
+  const [tenantNombre,   setTenantNombre]   = useState('');
+  const [tenantWebhook,  setTenantWebhook]  = useState('');
+  const [tenantSecret,   setTenantSecret]   = useState('');
+  const [adminKeyInput,  setAdminKeyInput]  = useState('');
+  const [adminKeyVis,    setAdminKeyVis]    = useState(false);
 
   // Mapeo
   const [seguroConfig,  setSeguroConfig]  = useState<SeguroConfig>({ baseUrl: '', authToken: '', cramo: 18, plan: '', frecuencia: 'A' });
@@ -287,9 +290,31 @@ export default function App() {
   const pushNotif = useCallback((tipo: Notif['tipo'], titulo: string, mensaje: string) => {
     const notif: Notif = { id: crypto.randomUUID(), tipo, titulo, mensaje, ts: new Date() };
     setNotifs(prev => [notif, ...prev].slice(0, 50));
-    if (tipo === 'success') toast.success(`${titulo}: ${mensaje}`, { duration: 3000 });
-    else if (tipo === 'error') toast.error(`${titulo}: ${mensaje}`, { duration: 5000 });
-    else toast(`${titulo}: ${mensaje}`, { duration: 3000 });
+    if (tipo === 'success')      toast.success(mensaje, { duration: 3000 });
+    else if (tipo === 'error')   toast.error(mensaje,   { duration: 6000 });
+    else if (tipo === 'warning') toast(mensaje,          { icon: '⚠️', duration: 4000 });
+    else                         toast(mensaje,          { duration: 3000 });
+  }, []);
+
+  /** Traduce errores técnicos del servidor a mensajes comprensibles para el usuario. */
+  const friendlyError = useCallback((e: unknown): { titulo: string; mensaje: string } => {
+    const err = e as { response?: { data?: Record<string, unknown>; status?: number }; message?: string };
+    const status = err?.response?.status;
+    const data   = err?.response?.data;
+    const raw    = String(data?.message ?? data?.error ?? err?.message ?? '');
+
+    if (!err?.response)                       return { titulo: 'Sin conexión',       mensaje: 'No se pudo conectar al servidor. Verifica que el backend esté corriendo.' };
+    if (raw.includes('ADMIN_SECRET'))         return { titulo: 'Configuración',      mensaje: 'El panel de administración no está habilitado en este servidor.' };
+    if (raw.includes('SESSION_SECRET'))       return { titulo: 'Configuración',      mensaje: 'El servidor no tiene configurado el módulo de sesiones.' };
+    if (status === 401)                       return { titulo: 'No autorizado',       mensaje: 'Tu sesión expiró o la clave es inválida. Reconecta tu API Key.' };
+    if (status === 403)                       return { titulo: 'Acceso denegado',     mensaje: 'No tienes permisos para realizar esta acción.' };
+    if (status === 404)                       return { titulo: 'No encontrado',       mensaje: 'El recurso solicitado no existe.' };
+    if (status === 409)                       return { titulo: 'Conflicto',           mensaje: raw || 'Ya existe un registro con esos datos.' };
+    if (status === 422 || status === 400)     return { titulo: 'Datos inválidos',     mensaje: raw || 'Revisa los campos del formulario.' };
+    if (status === 429)                       return { titulo: 'Límite alcanzado',    mensaje: 'Demasiadas solicitudes. Espera unos segundos e intenta de nuevo.' };
+    if (status === 503 || status === 502)     return { titulo: 'Servicio no disponible', mensaje: 'El servicio externo de seguros no responde en este momento.' };
+    if (status === 500)                       return { titulo: 'Error del servidor',  mensaje: 'Ocurrió un error interno. Revisa los logs del backend.' };
+    return { titulo: 'Error',                mensaje: raw || 'Ocurrió un error inesperado.' };
   }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -306,34 +331,33 @@ export default function App() {
       setTenantNombreConectado(res.data.tenant.nombre);
       pushNotif('success', 'Conectado', `Sesión iniciada como "${res.data.tenant.nombre}"`);
     } catch (e: unknown) {
-      const err = e as { response?: { status: number } };
       clearSession();
       setApiKeySet(false);
       setTenantNombreConectado('');
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        setApiKeyError('API Key inválida o inactiva.');
-        pushNotif('error', 'Acceso denegado', 'API Key inválida o inactiva');
-      } else {
-        setApiKeyError('No se pudo conectar al servidor.');
-        pushNotif('error', 'Sin conexión', 'No se pudo conectar al servidor');
-      }
+      const { titulo, mensaje } = friendlyError(e);
+      setApiKeyError(mensaje);
+      pushNotif('error', titulo, mensaje);
     } finally {
       setApiKeyLoading(false);
     }
   };
 
-  const doRequest = useCallback(async (fn: () => Promise<unknown>) => {
+  const doRequest = useCallback(async (fn: () => Promise<unknown>): Promise<boolean> => {
     setReqStatus('loading'); setResponse(null);
     try {
       const r = await fn();
       setResponse((r as { data: unknown }).data);
       setReqStatus('success');
+      return true;
     } catch (e: unknown) {
       const err = e as { response?: { data: unknown }; message: string };
       setResponse(err.response?.data ?? { error: err.message });
       setReqStatus('error');
+      const { titulo, mensaje } = friendlyError(e);
+      pushNotif('error', titulo, mensaje);
+      return false;
     }
-  }, []);
+  }, [friendlyError, pushNotif]);
 
   useEffect(() => {
     if (!apiKeySet || tab !== 'mapeo') return;
@@ -345,18 +369,24 @@ export default function App() {
         setFieldMappings(r.data.fieldMappings ?? {});
         setDefaultValues(Object.fromEntries(Object.entries(r.data.defaultValues ?? {}).map(([k, v]) => [k, String(v)])));
       })
-      .catch(() => {})
+      .catch(e => {
+        const { titulo, mensaje } = friendlyError(e);
+        pushNotif('error', titulo, `No se pudo cargar la configuración: ${mensaje}`);
+      })
       .finally(() => setMapeoLoading(false));
-  }, [apiKeySet, tab]);
+  }, [apiKeySet, tab, friendlyError, pushNotif]);
 
   const loadMonitor = useCallback(() => {
     if (!apiKeySet) return;
     setMonitorLoading(true);
     tenantApi.misPolizasCriticas()
       .then(r => setMonitorData(r.data as Record<string, unknown>))
-      .catch(() => {})
+      .catch(e => {
+        const { titulo, mensaje } = friendlyError(e);
+        pushNotif('error', titulo, mensaje);
+      })
       .finally(() => setMonitorLoading(false));
-  }, [apiKeySet]);
+  }, [apiKeySet, friendlyError, pushNotif]);
 
   useEffect(() => {
     if (apiKeySet && tab === 'monitor') loadMonitor();
@@ -375,17 +405,24 @@ export default function App() {
 
   const handleCrearTenant = (e: FormEvent) => {
     e.preventDefault();
-    doRequest(() => adminApi.crear({ nombre: tenantNombre, ...(tenantWebhook && { webhookUrl: tenantWebhook }), ...(tenantSecret && { webhookSecret: tenantSecret }) }));
+    if (!adminKeyInput.trim()) {
+      pushNotif('warning', 'Clave requerida', 'Ingresa la Admin Key para crear clientes.');
+      return;
+    }
+    doRequest(() => adminApi.crear(
+      { nombre: tenantNombre, ...(tenantWebhook && { webhookUrl: tenantWebhook }), ...(tenantSecret && { webhookSecret: tenantSecret }) },
+      adminKeyInput.trim(),
+    ));
   };
 
-  const handleGuardarMapeo = (e: FormEvent) => {
+  const handleGuardarMapeo = async (e: FormEvent) => {
     e.preventDefault(); setMapeoSaved(false);
     const cleanDefs: Record<string, string | number> = {};
     for (const [k, v] of Object.entries(defaultValues)) {
       if (v.trim()) { const n = Number(v); cleanDefs[k] = isNaN(n) ? v : n; }
     }
-    doRequest(() => tenantApi.configurarSeguro({ seguroConfig, fieldMappings, defaultValues: cleanDefs }))
-      .then(() => { setMapeoSaved(true); setTimeout(() => setMapeoSaved(false), 3000); });
+    const ok = await doRequest(() => tenantApi.configurarSeguro({ seguroConfig, fieldMappings, defaultValues: cleanDefs }));
+    if (ok) { setMapeoSaved(true); setTimeout(() => setMapeoSaved(false), 3000); }
   };
 
   const handleIniciar = (e: FormEvent) => {
@@ -709,6 +746,21 @@ export default function App() {
                 <div className="lg:col-span-3 card p-6">
                   <p className="section-title mb-5">{Ic.plus()} Datos del cliente</p>
                   <form onSubmit={handleCrearTenant} className="space-y-4">
+                    <div>
+                      <label className="label">Admin Key <span className="text-red-400">*</span></label>
+                      <div className="relative">
+                        <input className="input pr-10" type={adminKeyVis ? 'text' : 'password'}
+                          value={adminKeyInput} onChange={e => setAdminKeyInput(e.target.value)}
+                          placeholder="Clave de administración del servidor" required />
+                        <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          onClick={() => setAdminKeyVis(v => !v)}>
+                          {adminKeyVis ? Ic.eye('w-4 h-4') : Ic.eyeOff('w-4 h-4')}
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1">
+                        {Ic.info('w-3 h-3')} Valor de ADMIN_SECRET en el servidor
+                      </p>
+                    </div>
                     <div>
                       <label className="label">Nombre de la empresa <span className="text-red-400">*</span></label>
                       <input className="input" value={tenantNombre} onChange={e => setTenantNombre(e.target.value)}
