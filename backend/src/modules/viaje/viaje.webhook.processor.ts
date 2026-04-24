@@ -93,13 +93,13 @@ export class ViajeWebhookProcessor {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Ridery-Event': 'viaje.iniciado',
-      'X-Ridery-Delivery': String(job.id),
+      'X-Exelixi-Event': 'viaje.iniciado',
+      'X-Exelixi-Delivery': String(job.id),
     };
 
     const secret = tenantSecret || this.configService.get<string>('webhook.secret');
     if (secret) {
-      headers['X-Ridery-Signature'] = 'sha256=' + crypto
+      headers['X-Exelixi-Signature'] = 'sha256=' + crypto
         .createHmac('sha256', secret).update(JSON.stringify(payload)).digest('hex');
     }
 

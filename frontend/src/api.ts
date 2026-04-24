@@ -138,7 +138,14 @@ export const viajeApi = {
 export const adminApi = {
   crear:          (data: { nombre: string; webhookUrl?: string; webhookSecret?: string }) => api.post('/admin/tenants', data),
   listar:         () => api.get('/admin/tenants'),
-  polizasCriticas:() => api.get('/admin/tenants/polizas-criticas'),
+  /**
+   * Solo para admin: muestra pólizas críticas de TODOS los tenants.
+   * Requiere X-Admin-Key en el header; no usa el session token de cliente.
+   */
+  polizasCriticasAdmin: (adminKey: string) =>
+    axios.get(`${BASE_URL}/admin/tenants/polizas-criticas`, {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
 };
 
 export const tenantApi = {
@@ -148,4 +155,9 @@ export const tenantApi = {
     fieldMappings?: Record<string, string>;
     defaultValues?: Record<string, string | number>;
   }) => api.put('/tenant/me/seguro', data),
+  /**
+   * Panel de monitor para el tenant autenticado.
+   * Devuelve SOLO las pólizas de su propio tenant — nunca datos de otros.
+   */
+  misPolizasCriticas: () => api.get('/viaje/mis-polizas-criticas'),
 };

@@ -352,7 +352,7 @@ export default function App() {
   const loadMonitor = useCallback(() => {
     if (!apiKeySet) return;
     setMonitorLoading(true);
-    adminApi.polizasCriticas()
+    tenantApi.misPolizasCriticas()
       .then(r => setMonitorData(r.data as Record<string, unknown>))
       .catch(() => {})
       .finally(() => setMonitorLoading(false));

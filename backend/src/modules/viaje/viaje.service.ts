@@ -2,7 +2,7 @@ import {
   Injectable, Logger, NotFoundException, InternalServerErrorException, ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, Not } from 'typeorm';
+import { Repository, DataSource, Not, LessThan } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { ConfigService } from '@nestjs/config';
@@ -252,6 +252,30 @@ export class ViajeService {
       take: Math.min(limit, 100),
     });
     return { data, total };
+  }
+
+  /** Pólizas críticas del propio tenant — para el panel de monitoreo del cliente. */
+  async misPolizasCriticas(tenant: Tenant) {
+    const hace10min = new Date(Date.now() - 10 * 60 * 1000);
+    const viajes = await this.viajeRepo.find({
+      where: [
+        { tenantId: tenant.id, estadoPoliza: 'CRITICO' as any },
+        { tenantId: tenant.id, estadoPoliza: 'ERROR'   as any },
+        { tenantId: tenant.id, estadoPoliza: 'EMITIENDO' as any, creadoEn: LessThan(hace10min) },
+      ],
+      select: ['id', 'tenantId', 'numeroPlaca', 'estadoPoliza', 'polizaIntentos', 'polizaError', 'polizaUltimoIntento', 'creadoEn'],
+      order: { creadoEn: 'DESC' },
+      take: 200,
+    });
+    return {
+      alerta:    viajes.length > 0,
+      total:     viajes.length,
+      mensaje:   viajes.length === 0
+        ? 'Todas las pólizas están emitidas correctamente'
+        : `${viajes.length} póliza(s) pendiente(s) requieren atención`,
+      viajes,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   private toFloat(val: any): number | null {
