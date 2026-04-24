@@ -1,9 +1,9 @@
 #!/usr/bin/env pwsh
-# ╔══════════════════════════════════════════════════════════════════════╗
-# ║           EXELIXI-API — DETENER TODOS LOS SERVICIOS                 ║
-# ╚══════════════════════════════════════════════════════════════════════╝
+# ============================================================
+#   EXELIXI-API - DETENER TODOS LOS SERVICIOS
+# ============================================================
 
-function Write-OK { param($msg) Write-Host "  ✔  $msg" -ForegroundColor Green }
+function Write-OK { param($msg) Write-Host "  OK  $msg" -ForegroundColor Green }
 
 Write-Host "`n  Deteniendo servicios Exelixi-API...`n" -ForegroundColor Yellow
 
@@ -14,6 +14,14 @@ foreach ($port in @(3000, 5173)) {
         Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
         Write-OK "Puerto $port liberado"
     }
+}
+
+# Detener Redis (shutdown seguro para guardar datos)
+if (Test-Path "C:\redis-portable\redis-cli.exe") {
+    try {
+        & "C:\redis-portable\redis-cli.exe" shutdown nosave 2>&1 | Out-Null
+        Write-OK "Redis detenido"
+    } catch { }
 }
 
 # Matar cloudflared

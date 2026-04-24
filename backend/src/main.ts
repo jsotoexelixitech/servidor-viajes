@@ -35,7 +35,14 @@ async function bootstrap() {
   app.enableCors({
     origin: corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key', 'X-Idempotency-Key'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Api-Key',
+      'X-Session-Token',
+      'X-Admin-Key',
+      'X-Idempotency-Key',
+    ],
     credentials: true,
   });
 
@@ -54,17 +61,20 @@ async function bootstrap() {
   // ── Swagger (solo en no-producción) ───────────────────────────────────────
   if (nodeEnv !== 'production') {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('Ridery Backend API')
+      .setTitle('ExelixiTech API')
       .setDescription(
         'API REST multitenant para gestión de viajes con emisión de pólizas RCV.\n\n' +
-        '**Autenticación:** Header `X-Api-Key: <tu_api_key>`\n\n' +
+        '**Autenticación (recomendada):** Obtén un session token con `POST /auth/session` enviando tu `X-Api-Key`, luego usa `X-Session-Token` en las demás peticiones.\n\n' +
         '**Idempotencia:** Envía `X-Idempotency-Key: <uuid>` para prevenir duplicados.',
       )
-      .setVersion('1.0')
+      .setVersion('2.0')
+      .addApiKey({ type: 'apiKey', name: 'X-Session-Token', in: 'header' }, 'X-Session-Token')
       .addApiKey({ type: 'apiKey', name: 'X-Api-Key', in: 'header' }, 'X-Api-Key')
+      .addApiKey({ type: 'apiKey', name: 'X-Admin-Key', in: 'header' }, 'X-Admin-Key')
+      .addTag('Autenticación', 'Intercambio de API Key por session token seguro')
       .addTag('Viajes', 'Inicio, finalización y gestión de viajes + emisión de pólizas')
       .addTag('Mi Tenant (Configuración)', 'Configuración de seguro y mapeo de campos')
-      .addTag('Tenants (Admin)', 'Administración de tenants')
+      .addTag('Tenants (Admin)', 'Administración de tenants — requiere X-Admin-Key')
       .addTag('Health', 'Health checks del sistema')
       .build();
 
@@ -84,7 +94,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const appLogger = new Logger('Bootstrap');
-  appLogger.log(`🚀 Ridery Backend en http://0.0.0.0:${port}/${prefix} [PID ${process.pid}]`);
+  appLogger.log(`ExelixiTech API en http://0.0.0.0:${port}/${prefix} [PID ${process.pid}]`);
   if (nodeEnv !== 'production') {
     appLogger.log(`📚 Swagger: http://localhost:${port}/${prefix}/docs`);
   }

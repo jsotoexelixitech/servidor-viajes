@@ -31,17 +31,39 @@ foreach ($port in @(3000, 5173)) {
 }
 Start-Sleep -Milliseconds 500
 
-# -- 2. Crear carpeta de logs si no existe -------------------
+# -- 2. Redis ------------------------------------------------
+Write-Step "Verificando Redis..."
+$redisRunning = $false
+try {
+    $r = & "C:\redis-portable\redis-cli.exe" ping 2>&1
+    if ($r -eq "PONG") { $redisRunning = $true; Write-OK "Redis ya esta corriendo" }
+} catch { }
+
+if (-not $redisRunning) {
+    if (Test-Path "C:\redis-portable\redis-server.exe") {
+        Start-Process -FilePath "C:\redis-portable\redis-server.exe" `
+            -ArgumentList "--port 6379 --save 60 1 --dir C:\redis-portable" `
+            -WindowStyle Hidden
+        Start-Sleep -Seconds 2
+        $r2 = & "C:\redis-portable\redis-cli.exe" ping 2>&1
+        if ($r2 -eq "PONG") { Write-OK "Redis iniciado correctamente" }
+        else                 { Write-Warn "Redis no pudo iniciarse - las colas y cache pueden no funcionar" }
+    } else {
+        Write-Warn "redis-server.exe no encontrado en C:\redis-portable - instala Redis o usa Docker"
+    }
+}
+
+# -- 3. Crear carpeta de logs si no existe -------------------
 New-Item -ItemType Directory -Path "$ROOT\backend\logs" -Force | Out-Null
 
-# -- 3. Arrancar Backend (dev con hot-reload) ----------------
+# -- 4. Arrancar Backend (dev con hot-reload) ----------------
 Write-Step "Arrancando backend NestJS (hot-reload)..."
 $backendJob = Start-Process -FilePath "powershell" `
     -ArgumentList "-NoProfile", "-Command", "Set-Location '$ROOT\backend'; npm run start:dev 2>&1 | Tee-Object -FilePath '$ROOT\backend\logs\dev.log'" `
     -PassThru -WindowStyle Minimized
 Write-OK "Backend iniciado (PID $($backendJob.Id)) -- logs en backend/logs/dev.log"
 
-# -- 4. Esperar que el backend arranque ----------------------
+# -- 5. Esperar que el backend arranque ----------------------
 Write-Step "Esperando backend..."
 $waited = 0
 while ($waited -lt 60) {
@@ -55,7 +77,7 @@ while ($waited -lt 60) {
     Write-Host "  ... ($waited s)" -ForegroundColor DarkGray
 }
 
-# -- 5. Arrancar Frontend (Vite dev server) ------------------
+# -- 6. Arrancar Frontend (Vite dev server) ------------------
 Write-Step "Arrancando frontend Vite..."
 $frontendJob = Start-Process -FilePath "powershell" `
     -ArgumentList "-NoProfile", "-Command", "Set-Location '$ROOT\frontend'; npm run dev 2>&1" `
@@ -64,7 +86,7 @@ Write-OK "Frontend iniciado (PID $($frontendJob.Id))"
 
 Start-Sleep -Seconds 5
 
-# -- 6. Cloudflare Tunnel (opcional) -------------------------
+# -- 7. Cloudflare Tunnel (opcional) -------------------------
 $tunnelUrl = $null
 if ($Tunnel) {
     Write-Step "Levantando Cloudflare Quick Tunnel (puerto 5173)..."
@@ -100,7 +122,7 @@ if ($Tunnel) {
     else            { Write-Warn "No se obtuvo URL del tunel. Revisa tunnel.log" }
 }
 
-# -- 7. Resumen ----------------------------------------------
+# -- 8. Resumen ----------------------------------------------
 Write-Host ""
 Write-Host "  ============================================================" -ForegroundColor Green
 Write-Host "                 EXELIXI-API EN DESARROLLO                    " -ForegroundColor Green
