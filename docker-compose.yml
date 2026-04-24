@@ -1,0 +1,142 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: exelixi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-exelixi}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-exelixi_password}
+      POSTGRES_DB: ${DB_NAME:-exelixi_api_db}
+    # Aumentar max_connections para soportar cluster de workers.
+    # Formula: workers × pool_por_worker + headroom = max_connections
+    # Ejemplo: 8 workers × 20 pool + 20 headroom = 180 → redondeamos a 200
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c random_page_cost=1.1
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-exelixi} -d ${DB_NAME:-exelixi_api_db}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - exelixi-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: exelixi-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync always
+      --no-appendfsync-on-rewrite no
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
+      --save 60 1000
+      --save 300 100
+      --save 900 1
+      --maxmemory 512mb
+      --maxmemory-policy noeviction
+      --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - exelixi-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: exelixi-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-exelixi}
+      DB_PASSWORD: ${DB_PASSWORD:-exelixi_password}
+      DB_NAME: ${DB_NAME:-exelixi_api_db}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-50}
+      PG_MAX_CONNECTIONS: ${PG_MAX_CONNECTIONS:-200}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      EXTERNAL_WEBHOOK_URL: ${EXTERNAL_WEBHOOK_URL:-}
+      EXTERNAL_WEBHOOK_SECRET: ${EXTERNAL_WEBHOOK_SECRET:-}
+      EXTERNAL_WEBHOOK_TIMEOUT: ${EXTERNAL_WEBHOOK_TIMEOUT:-10000}
+      EXTERNAL_WEBHOOK_RETRIES: ${EXTERNAL_WEBHOOK_RETRIES:-3}
+      THROTTLE_TTL: ${THROTTLE_TTL:-60000}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-1000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:80}
+    volumes:
+      - backend_logs:/app/logs
+    ports:
+      - '3000:3000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - ridery-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: exelixi-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '80:80'
+    networks:
+      - exelixi-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_logs:
+    driver: local
+
+networks:
+  exelixi-network:
+    driver: bridge

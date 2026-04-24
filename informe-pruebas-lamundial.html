@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Informe Técnico – Pruebas API La Mundial de Seguros</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 48px 60px;
+      max-width: 920px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── Encabezado ── */
+    .header { border-bottom: 2px solid #1a1a1a; padding-bottom: 18px; margin-bottom: 28px; }
+    .header-label {
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #666; margin-bottom: 6px;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .header-sub { font-size: 12px; color: #555; }
+
+    /* ── Secciones ── */
+    h2 { font-size: 15px; font-weight: 700; margin: 28px 0 10px; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
+    h3 { font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
+
+    p { margin-bottom: 10px; }
+
+    /* ── Callout ── */
+    .callout {
+      border-left: 4px solid #d97706;
+      background: #fffbeb;
+      padding: 12px 16px;
+      margin: 16px 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .callout.error {
+      border-left-color: #dc2626;
+      background: #fef2f2;
+    }
+    .callout strong { display: block; margin-bottom: 4px; font-size: 13px; }
+    .callout code { background: #fee2e2; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 12px; }
+
+    /* ── Stats row ── */
+    .stats { display: flex; gap: 16px; margin: 14px 0; }
+    .stat {
+      flex: 1; border: 1px solid #e5e7eb; border-radius: 6px;
+      padding: 14px 16px; text-align: center;
+    }
+    .stat-value { font-size: 22px; font-weight: 700; }
+    .stat-label { font-size: 11px; color: #555; margin-top: 3px; }
+    .stat.success .stat-value { color: #16a34a; }
+    .stat.warning .stat-value { color: #d97706; }
+    .stat.error   .stat-value { color: #dc2626; }
+
+    /* ── Tablas ── */
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 12px; }
+    th {
+      background: #f3f4f6; font-weight: 600; text-align: left;
+      padding: 8px 10px; border: 1px solid #e5e7eb;
+    }
+    td { padding: 8px 10px; border: 1px solid #e5e7eb; vertical-align: top; }
+    tr:hover td { background: #fafafa; }
+    tr.row-error td { background: #fef2f2; }
+
+    /* ── Pills / badges ── */
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 9999px;
+      font-size: 11px; font-weight: 600; white-space: nowrap;
+    }
+    .pill.ok      { background: #dcfce7; color: #15803d; }
+    .pill.falla   { background: #fee2e2; color: #dc2626; }
+    .pill.critico { background: #fee2e2; color: #dc2626; }
+    .pill.importante { background: #fef9c3; color: #854d0e; }
+    .pill.futuro  { background: #dcfce7; color: #15803d; }
+
+    code { font-family: 'Consolas', 'Courier New', monospace; font-size: 11.5px;
+           background: #f3f4f6; padding: 1px 5px; border-radius: 3px; }
+
+    /* ── Card de datos vehículo ── */
+    .vehicle-card {
+      border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px 20px;
+      margin: 12px 0;
+    }
+    .vehicle-card-title { font-weight: 600; margin-bottom: 12px; font-size: 13px; }
+    .vehicle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; }
+    .vehicle-field label { display: block; font-size: 11px; color: #666; margin-bottom: 2px; }
+    .vehicle-field span  { font-weight: 600; font-size: 13px; }
+
+    /* ── Lista ordenada ── */
+    ol { margin: 10px 0 10px 20px; }
+    ol li { margin-bottom: 5px; }
+
+    /* ── Pie de página ── */
+    .footer {
+      margin-top: 40px; padding-top: 14px; border-top: 1px solid #e0e0e0;
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: #888;
+    }
+
+    /* ── Print ── */
+    @media print {
+      body { padding: 24px 32px; }
+      .no-print { display: none; }
+      @page { margin: 20mm 15mm; }
+      h2 { page-break-after: avoid; }
+      table { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Botón imprimir (solo pantalla) -->
+  <div class="no-print" style="text-align:right; margin-bottom:20px;">
+    <button onclick="window.print()"
+      style="padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer;
+             background:#1a1a1a; color:#fff; border:none; border-radius:5px;">
+      Imprimir / Guardar como PDF
+    </button>
+  </div>
+
+  <!-- ══ ENCABEZADO ══════════════════════════════════════════════════════════ -->
+  <div class="header">
+    <div class="header-label">Informe Técnico de Integración</div>
+    <h1>Pruebas sobre la API de Emisión RCV</h1>
+    <div class="header-sub">La Mundial de Seguros &nbsp;·&nbsp; Entorno QA &nbsp;·&nbsp; 20 de abril de 2026</div>
+  </div>
+
+  <!-- ══ CONTEXTO ════════════════════════════════════════════════════════════ -->
+  <p>
+    En el marco del desarrollo de una plataforma intermediaria para la emisión automática de pólizas RCV
+    en viajes de taxi por aplicación, realizamos pruebas de integración contra el entorno QA de la API
+    documentada en <strong>«Documentación Uso de Endpoints – Emisión RCV V2.1»</strong>.
+  </p>
+  <p>
+    El objetivo fue validar el flujo completo de 8 pasos hasta la emisión de una póliza de prueba,
+    usando un vehículo tipo taxi (Chevrolet Aveo 2018, categoría 6 – Alquiler con chofer / Taxi).
+    A continuación se detallan los resultados obtenidos, las inconsistencias encontradas en la
+    documentación y los requerimientos pendientes para continuar la integración.
+  </p>
+
+  <!-- ══ RESUMEN ═════════════════════════════════════════════════════════════ -->
+  <h2>Resumen de resultados</h2>
+  <div class="stats">
+    <div class="stat success">
+      <div class="stat-value">6 / 7</div>
+      <div class="stat-label">Endpoints operativos</div>
+    </div>
+    <div class="stat warning">
+      <div class="stat-value">1 / 7</div>
+      <div class="stat-label">Fallo por autenticación</div>
+    </div>
+    <div class="stat warning">
+      <div class="stat-value">6</div>
+      <div class="stat-label">Inconsistencias en documento</div>
+    </div>
+  </div>
+
+  <!-- ══ DETALLE DE PRUEBAS ══════════════════════════════════════════════════ -->
+  <h2>Detalle de pruebas por endpoint</h2>
+  <p style="color:#555; font-size:12px;">URL base: <code>https://qaapisys2000.lamundialdeseguros.com</code></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Endpoint</th>
+        <th>Propósito</th>
+        <th>Estado</th>
+        <th>Resultado / Respuesta</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td><td><code>POST /api/v1/inma/year</code></td>
+        <td>Años válidos del catálogo</td>
+        <td><span class="pill ok">OK</span></td>
+        <td>Rango: 1950 – 2028</td>
+      </tr>
+      <tr>
+        <td>2</td><td><code>POST /api/v1/inma/marca</code></td>
+        <td>Marcas disponibles para un año</td>
+        <td><span class="pill ok">OK</span></td>
+        <td>Chevrolet = <code>013</code> · Toyota = <code>074</code></td>
+      </tr>
+      <tr>
+        <td>3</td><td><code>POST /api/v1/inma/modelo</code></td>
+        <td>Modelos por año y marca</td>
+        <td><span class="pill ok">OK</span></td>
+        <td>Aveo = <code>096</code> · Spark = <code>105</code></td>
+      </tr>
+      <tr>
+        <td>4</td><td><code>POST /api/v1/inma/version</code></td>
+        <td>Versiones y tipo de vehículo</td>
+        <td><span class="pill ok">OK</span></td>
+        <td>Aveo: v<code>31</code> LS Auto, v<code>32</code> LT Turbo</td>
+      </tr>
+      <tr>
+        <td>5</td><td><code>POST /api/v1/external/getCategoriasUso</code></td>
+        <td>Categorías de uso por versión</td>
+        <td><span class="pill ok">OK</span></td>
+        <td>Cat. <code>6</code> = Alquiler con chofer / Taxi ✓</td>
+      </tr>
+      <tr>
+        <td>6</td><td><code>POST /api/v1/external/getCotizacionAuto</code></td>
+        <td>Prima RCV plan RCVBAS</td>
+        <td><span class="pill ok">OK</span></td>
+        <td>Prima: Bs. 22.172,11 · Prima ext: 46,08 · Tasa: 481,22</td>
+      </tr>
+      <tr class="row-error">
+        <td>7</td><td><code>POST /api/v1/external/createEmissionAuto</code></td>
+        <td>Emisión de póliza RCV</td>
+        <td><span class="pill falla">FALLA</span></td>
+        <td><em>"Fallo de Autenticación: Token No Encontrado"</em></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ CALLOUT BLOQUEO ════════════════════════════════════════════════════ -->
+  <div class="callout error">
+    <strong>Bloqueo principal: autenticación no documentada</strong>
+    El endpoint <code>POST /external/createEmissionAuto</code> exige un <strong>Bearer Token</strong> que
+    no aparece en ninguna sección del documento V2.1. No existe endpoint de login, credenciales de prueba
+    ni instrucciones de autenticación. Sin esto no es posible completar la prueba de emisión ni avanzar
+    a producción.
+  </div>
+
+  <!-- ══ INCONSISTENCIAS ════════════════════════════════════════════════════ -->
+  <h2>Inconsistencias encontradas en la documentación V2.1</h2>
+  <p style="color:#555; font-size:12px;">
+    Los siguientes problemas fueron identificados durante las pruebas. Se solicita revisión y corrección.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>Inconsistencia</th><th>Descripción</th><th>Acción requerida</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>/inma/year — método HTTP incorrecto</strong></td>
+        <td>El documento indica <code>GET</code>, pero el servidor solo responde a <code>POST</code>. Confirmado en prueba.</td>
+        <td>Corregir a POST en la documentación oficial.</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>Campo <code>año</code> vs <code>fano</code></strong></td>
+        <td>La tabla de campos (pág. 9) llama al año del vehículo <code>año</code>. El JSON de ejemplo (pág. 10) usa <code>fano</code>. La API responde a <code>fano</code>.</td>
+        <td>Confirmar el nombre oficial del campo en producción y unificar la documentación.</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>Typo: <code>estado_civi_tomador</code></strong></td>
+        <td>La tabla de campos (pág. 8) usa <code>estado_civi_tomador</code> (sin la <em>l</em> final). El JSON de ejemplo usa <code>estado_civil_tomador</code>.</td>
+        <td>Confirmar el nombre exacto del campo para tomador y titular.</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>Respuesta de getCotizacionAuto incorrecta</strong></td>
+        <td>El documento (pág. 7) muestra como respuesta una lista de <code>categorias_uso</code>. La respuesta real contiene <code>mprima</code>, <code>mprimaext</code> y <code>ptasa</code>. Es un error de copy-paste del endpoint anterior.</td>
+        <td>Actualizar el ejemplo de respuesta en la documentación.</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><strong>Entorno DEV caído</strong></td>
+        <td><code>https://devapisys2000.lamundialdeseguros.com</code> no responde (error de conexión / SSL). Solo el entorno QA está operativo.</td>
+        <td>Reportar al equipo de infraestructura.</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><strong>Autenticación completamente ausente</strong></td>
+        <td>El endpoint <code>createEmissionAuto</code> exige un Bearer Token que no aparece en el documento. No hay endpoint de login, credenciales de prueba ni descripción del flujo de autenticación.</td>
+        <td>Proveer documentación del flujo de autenticación.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ VEHÍCULO DE PRUEBA ═════════════════════════════════════════════════ -->
+  <h2>Parámetros del vehículo de prueba</h2>
+
+  <div class="vehicle-card">
+    <div class="vehicle-card-title">Chevrolet Aveo 2018 — Taxi / Alquiler con chofer</div>
+    <div class="vehicle-grid">
+      <div class="vehicle-field"><label>Marca</label><span>Chevrolet &nbsp;<code>013</code></span></div>
+      <div class="vehicle-field"><label>Modelo</label><span>Aveo &nbsp;<code>096</code></span></div>
+      <div class="vehicle-field"><label>Versión</label><span>LS Automático &nbsp;<code>31</code></span></div>
+      <div class="vehicle-field"><label>Año</label><span>2018</span></div>
+      <div class="vehicle-field"><label>Categoría de uso</label><span>6 — Taxi / Alquiler c/ chofer</span></div>
+      <div class="vehicle-field"><label>Plan</label><span>RCVBAS</span></div>
+      <div class="vehicle-field"><label>Prima RCV</label><span>Bs. 22.172,11</span></div>
+      <div class="vehicle-field"><label>Prima externa</label><span>46,08</span></div>
+      <div class="vehicle-field"><label>Tasa</label><span>481,22</span></div>
+    </div>
+  </div>
+
+  <!-- ══ REQUERIMIENTOS PENDIENTES ══════════════════════════════════════════ -->
+  <h2>Requerimientos pendientes — solicitud formal</h2>
+  <p style="color:#555; font-size:12px;">
+    Los siguientes elementos son necesarios para continuar el desarrollo e ir a producción.
+    Se solicita formalmente su provisión por parte de La Mundial de Seguros.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Requerimiento</th><th>Detalle</th><th>Prioridad</th></tr>
+    </thead>
+    <tbody>
+      <tr class="row-error">
+        <td><strong>Credenciales de autenticación QA</strong></td>
+        <td>Usuario y contraseña (o API Key) para obtener el Bearer Token en el entorno QA. Sin esto no es posible probar la emisión.</td>
+        <td><span class="pill critico">Crítico</span></td>
+      </tr>
+      <tr class="row-error">
+        <td><strong>Endpoint de login / token</strong></td>
+        <td>URL y método del endpoint que devuelve el Bearer Token. ¿Expira? ¿Cuánto dura? ¿Cómo se refresca?</td>
+        <td><span class="pill critico">Crítico</span></td>
+      </tr>
+      <tr class="row-error">
+        <td><strong>Código de productor asignado</strong></td>
+        <td>El ejemplo del documento usa <code>80080</code>. Cada cliente debe tener un código propio. Necesitamos el nuestro para QA y Producción.</td>
+        <td><span class="pill critico">Crítico</span></td>
+      </tr>
+      <tr class="row-error">
+        <td><strong>Endpoint de cancelación de póliza</strong></td>
+        <td>El sistema emite una póliza al inicio de cada viaje y debe cancelarla al finalizar. No existe ningún endpoint de cancelación en la documentación V2.1. ¿Existe? ¿Cómo funciona?</td>
+        <td><span class="pill critico">Crítico</span></td>
+      </tr>
+      <tr>
+        <td><strong>Confirmación: campo <code>año</code> o <code>fano</code></strong></td>
+        <td>Confirmar el nombre definitivo del campo año del vehículo en el body de <code>createEmissionAuto</code> y en producción.</td>
+        <td><span class="pill importante">Importante</span></td>
+      </tr>
+      <tr>
+        <td><strong>Confirmación: <code>estado_civil_tomador</code></strong></td>
+        <td>Confirmar el nombre exacto del campo de estado civil del tomador y titular para evitar rechazos en emisión.</td>
+        <td><span class="pill importante">Importante</span></td>
+      </tr>
+      <tr>
+        <td><strong>Documentación del entorno Producción</strong></td>
+        <td>Proceso para migrar de QA a Producción, credenciales, diferencias de configuración y SLA del servicio.</td>
+        <td><span class="pill futuro">Planificación</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ PRÓXIMOS PASOS ═════════════════════════════════════════════════════ -->
+  <h2>Próximos pasos</h2>
+  <p>Una vez que La Mundial de Seguros provea las credenciales de autenticación y el endpoint de login, procederemos a:</p>
+  <ol>
+    <li>Completar la prueba de emisión de póliza RCV con datos reales de un viaje de taxi.</li>
+    <li>Validar la URL del PDF de la póliza devuelta y confirmar su descarga correcta.</li>
+    <li>Integrar el flujo de cancelación de póliza al finalizar el viaje.</li>
+    <li>Realizar pruebas de volumen para validar el comportamiento bajo miles de viajes simultáneos.</li>
+    <li>Coordinar el pase a producción con el equipo de La Mundial.</li>
+  </ol>
+
+  <p style="margin-top: 16px;">Quedamos atentos a su respuesta. Agradecemos la atención prestada.</p>
+
+  <!-- ══ PIE ════════════════════════════════════════════════════════════════ -->
+  <div class="footer">
+    <span>Documento generado: 20 de abril de 2026</span>
+    <span>Confidencial — intercambio con La Mundial de Seguros</span>
+  </div>
+
+</body>
+</html>
