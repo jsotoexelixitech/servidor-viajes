@@ -44,6 +44,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
       stopAtFirstError: false,
@@ -69,7 +70,7 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup(`${prefix}/docs`, app, document, {
-      swaggerOptions: { persistAuthorization: true, displayRequestDuration: true },
+      swaggerOptions: { persistAuthorization: false, displayRequestDuration: true },
     });
     app.getHttpAdapter().get(`/${prefix}/docs-json`, (_req, res) => res.json(document));
   }

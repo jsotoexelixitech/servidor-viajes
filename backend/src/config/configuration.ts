@@ -28,6 +28,11 @@ export default () => {
     prefix: process.env.APP_PREFIX || 'api',
     corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173').split(','),
   },
+  security: {
+    sessionSecret: process.env.SESSION_SECRET || 'dev-session-secret-change-in-production',
+    adminSecret:   process.env.ADMIN_SECRET   || '',
+    sessionTtlHours: parseInt(process.env.SESSION_TTL_HOURS ?? '8', 10),
+  },
   cluster: {
     workers: numWorkers,
   },

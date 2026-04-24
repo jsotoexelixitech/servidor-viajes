@@ -22,6 +22,7 @@ import { VehiculoModule } from './modules/vehiculo/vehiculo.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { RedisModule } from './common/redis/redis.module';
+import { SessionModule } from './common/session/session.module';
 
 @Module({
   imports: [
@@ -90,6 +91,9 @@ import { RedisModule } from './common/redis/redis.module';
 
     // Cliente Redis compartido entre todos los módulos (circuit breaker, caché tenant, guardian lock)
     RedisModule,
+
+    // Sesión segura stateless (HMAC) — global para todos los módulos
+    SessionModule,
 
     // Servir frontend compilado en producción (npm run build → frontend/dist)
     // En desarrollo, Vite dev server maneja el frontend por separado.

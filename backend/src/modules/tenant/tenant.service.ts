@@ -26,6 +26,20 @@ export class TenantService {
     private readonly redis: Redis,
   ) {}
 
+  async findById(id: string): Promise<Tenant | null> {
+    try {
+      const cached = await this.redis.get(`tenant:id:${id}`);
+      if (cached) return JSON.parse(cached) as Tenant;
+    } catch { /* Redis no disponible */ }
+    const tenant = await this.tenantRepo.findOne({ where: { id, activo: true } });
+    if (tenant) {
+      try {
+        await this.redis.set(`tenant:id:${id}`, JSON.stringify(tenant), 'EX', this.CACHE_TTL_SECONDS);
+      } catch { /* Redis no disponible */ }
+    }
+    return tenant;
+  }
+
   async findByApiKey(apiKey: string): Promise<Tenant | null> {
     // 1. Intentar caché Redis (compartida entre workers)
     try {

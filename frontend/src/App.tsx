@@ -1,11 +1,20 @@
 import React, { useState, useCallback, useEffect, useRef, FormEvent } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import {
-  setApiKey, viajeApi, tenantApi, adminApi,
+  authApi, setSessionToken, clearSession, viajeApi, tenantApi, adminApi,
   Viaje, CAMPOS_SEGURO, SeguroConfig, FRECUENCIAS, CampoSeguro,
 } from './api';
 
 type Tab = 'dashboard' | 'setup' | 'mapeo' | 'viaje' | 'finalizar' | 'listar' | 'monitor';
 type ReqStatus = 'idle' | 'loading' | 'success' | 'error';
+
+interface Notif {
+  id: string;
+  tipo: 'success' | 'error' | 'info' | 'warning';
+  titulo: string;
+  mensaje: string;
+  ts: Date;
+}
 
 // ─── Icons (crisp SVGs, 16px optical size) ────────────────────────────────────
 const Ic = {
@@ -237,9 +246,14 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [apiKeySet,   setApiKeySet]   = useState(false);
-  const [apiKeyVis,   setApiKeyVis]   = useState(false);
+  const [apiKeyInput,   setApiKeyInput]   = useState('');
+  const [apiKeySet,     setApiKeySet]     = useState(false);
+  const [apiKeyVis,     setApiKeyVis]     = useState(false);
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [apiKeyError,   setApiKeyError]   = useState('');
+  const [tenantNombreConectado, setTenantNombreConectado] = useState('');
+  const [notifs,        setNotifs]        = useState<Notif[]>([]);
+  const [notifOpen,     setNotifOpen]     = useState(false);
   const apiKeyRef = useRef<HTMLInputElement>(null);
 
   const [response,   setResponse]  = useState<unknown>(null);
@@ -269,11 +283,43 @@ export default function App() {
   const [monitorData,    setMonitorData]    = useState<Record<string, unknown> | null>(null);
   const [monitorLoading, setMonitorLoading] = useState(false);
 
+  // ── Notificaciones ────────────────────────────────────────────────────────
+  const pushNotif = useCallback((tipo: Notif['tipo'], titulo: string, mensaje: string) => {
+    const notif: Notif = { id: crypto.randomUUID(), tipo, titulo, mensaje, ts: new Date() };
+    setNotifs(prev => [notif, ...prev].slice(0, 50));
+    if (tipo === 'success') toast.success(`${titulo}: ${mensaje}`, { duration: 3000 });
+    else if (tipo === 'error') toast.error(`${titulo}: ${mensaje}`, { duration: 5000 });
+    else toast(`${titulo}: ${mensaje}`, { duration: 3000 });
+  }, []);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleSetApiKey = () => {
-    if (!apiKeyInput.trim()) return;
-    setApiKey(apiKeyInput.trim());
-    setApiKeySet(true);
+  const handleSetApiKey = async () => {
+    const key = apiKeyInput.trim();
+    if (!key) return;
+    setApiKeyLoading(true);
+    setApiKeyError('');
+    try {
+      const res = await authApi.login(key);
+      setSessionToken(res.data.sessionToken);
+      setApiKeySet(true);
+      setApiKeyInput('');
+      setTenantNombreConectado(res.data.tenant.nombre);
+      pushNotif('success', 'Conectado', `Sesión iniciada como "${res.data.tenant.nombre}"`);
+    } catch (e: unknown) {
+      const err = e as { response?: { status: number } };
+      clearSession();
+      setApiKeySet(false);
+      setTenantNombreConectado('');
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setApiKeyError('API Key inválida o inactiva.');
+        pushNotif('error', 'Acceso denegado', 'API Key inválida o inactiva');
+      } else {
+        setApiKeyError('No se pudo conectar al servidor.');
+        pushNotif('error', 'Sin conexión', 'No se pudo conectar al servidor');
+      }
+    } finally {
+      setApiKeyLoading(false);
+    }
   };
 
   const doRequest = useCallback(async (fn: () => Promise<unknown>) => {
@@ -393,6 +439,11 @@ export default function App() {
   // ═══════════════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen flex flex-col bg-[#f4f6fb]">
+      <Toaster position="top-right" toastOptions={{
+        style: { fontSize: '12px', fontWeight: 600, borderRadius: '10px', maxWidth: '360px' },
+        success: { style: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' } },
+        error:   { style: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' } },
+      }} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="h-14 bg-white border-b border-slate-100 sticky top-0 z-40"
@@ -433,7 +484,7 @@ export default function App() {
                 type={apiKeyVis ? 'text' : 'password'}
                 placeholder="API Key del cliente…"
                 value={apiKeyInput}
-                onChange={e => setApiKeyInput(e.target.value)}
+                onChange={e => { setApiKeyInput(e.target.value); setApiKeyError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleSetApiKey()}
                 className="input pl-8 pr-8 h-8 text-xs rounded-lg"
               />
@@ -442,14 +493,18 @@ export default function App() {
                 {Ic.eye('w-3.5 h-3.5')}
               </button>
             </div>
-            <button onClick={handleSetApiKey}
-              className="btn-primary h-8 text-xs px-3.5 rounded-lg whitespace-nowrap shrink-0">
+            <button onClick={handleSetApiKey} disabled={apiKeyLoading || !apiKeyInput.trim()}
+              className="btn-primary h-8 text-xs px-3.5 rounded-lg whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+              {apiKeyLoading && <Spinner size="sm" />}
               {apiKeySet ? 'Actualizar' : 'Conectar'}
             </button>
-            {apiKeySet && (
+            {apiKeyError && (
+              <span className="text-[10.5px] font-bold text-red-500 whitespace-nowrap shrink-0">{apiKeyError}</span>
+            )}
+            {apiKeySet && !apiKeyError && (
               <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-emerald-600 bg-emerald-50 ring-1 ring-inset ring-emerald-200/70 px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Conectado
+                {tenantNombreConectado ? tenantNombreConectado : 'Conectado'}
               </div>
             )}
           </div>
@@ -461,6 +516,58 @@ export default function App() {
               <span className="ml-1">buscar</span>
             </span>
             <div className="w-px h-4 bg-slate-100 hidden lg:block" />
+
+            {/* Campana de notificaciones */}
+            <div className="relative">
+              <button onClick={() => setNotifOpen(o => !o)}
+                className="relative w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 1a5 5 0 0 1 5 5v3l1.5 2H1.5L3 9V6a5 5 0 0 1 5-5z"/>
+                  <path d="M6.5 13a1.5 1.5 0 0 0 3 0"/>
+                </svg>
+                {notifs.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-extrabold flex items-center justify-center">
+                    {notifs.length > 9 ? '9+' : notifs.length}
+                  </span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div className="absolute right-0 top-10 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                    <span className="text-xs font-extrabold text-slate-700">Notificaciones</span>
+                    {notifs.length > 0 && (
+                      <button onClick={() => setNotifs([])}
+                        className="text-[10px] text-slate-400 hover:text-red-500 transition-colors font-semibold">
+                        Limpiar todo
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
+                    {notifs.length === 0 ? (
+                      <p className="text-center text-xs text-slate-400 py-6">Sin notificaciones</p>
+                    ) : notifs.map(n => (
+                      <div key={n.id} className={`flex gap-3 px-4 py-3 text-xs ${
+                        n.tipo === 'success' ? 'bg-emerald-50/50' :
+                        n.tipo === 'error'   ? 'bg-red-50/50' :
+                        n.tipo === 'warning' ? 'bg-amber-50/50' : 'bg-white'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${
+                          n.tipo === 'success' ? 'bg-emerald-500' :
+                          n.tipo === 'error'   ? 'bg-red-500' :
+                          n.tipo === 'warning' ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-700 truncate">{n.titulo}</p>
+                          <p className="text-slate-500 mt-0.5">{n.mensaje}</p>
+                          <p className="text-slate-300 mt-1">{n.ts.toLocaleTimeString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="w-px h-4 bg-slate-100" />
             <span className="text-[11px] text-slate-300 font-semibold hidden lg:block">v2.1</span>
           </div>
         </div>
@@ -651,7 +758,25 @@ export default function App() {
                         <CopyButton text={(response as any).apiKey} compact />
                       </div>
                       <button className="mt-3 btn-primary w-full text-xs"
-                        onClick={() => { setApiKeyInput((response as any).apiKey); setApiKey((response as any).apiKey); setApiKeySet(true); }}>
+                        onClick={async () => {
+                          const key = (response as any).apiKey as string;
+                          setApiKeyInput(key);
+                          setApiKeyLoading(true);
+                          setApiKeyError('');
+                          try {
+                            const res = await authApi.login(key);
+                            setSessionToken(res.data.sessionToken);
+                            setApiKeySet(true);
+                            setApiKeyInput('');
+                            setTenantNombreConectado(res.data.tenant.nombre);
+                            pushNotif('success', 'Conectado', `Sesión iniciada como "${res.data.tenant.nombre}"`);
+                          } catch {
+                            setApiKeyError('No se pudo iniciar sesión automáticamente.');
+                            pushNotif('error', 'Error', 'No se pudo iniciar sesión con la nueva API Key');
+                          } finally {
+                            setApiKeyLoading(false);
+                          }
+                        }}>
                         {Ic.key()} Usar esta API Key ahora
                       </button>
                     </div>
@@ -738,7 +863,7 @@ export default function App() {
                     </p>
                     {/* Group tabs */}
                     <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mb-4">
-                      {(Object.keys(GRUPO_META) as Array<keyof typeof GRUPO_META>).map(g => {
+                      {(Object.keys(GRUPO_META) as Array<keyof typeof GRUPO_META>).filter(g => g !== 'interno').map(g => {
                         const cnt   = CAMPOS_SEGURO.filter(c => c.grupo === g && fieldMappings[c.key]?.trim()).length;
                         const total = CAMPOS_SEGURO.filter(c => c.grupo === g).length;
                         return (

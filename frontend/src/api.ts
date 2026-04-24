@@ -8,9 +8,43 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-export function setApiKey(key: string) {
-  api.defaults.headers.common['X-Api-Key'] = key;
+/**
+ * Establece el session token en memoria (axios defaults).
+ * NUNCA se guarda en localStorage ni sessionStorage.
+ * Al cerrar la pestaña o recargar, se pierde — el usuario debe reconectarse.
+ */
+export function setSessionToken(token: string) {
+  api.defaults.headers.common['X-Session-Token'] = token;
+  delete api.defaults.headers.common['X-Api-Key'];
 }
+
+/** Limpia la sesión (logout). */
+export function clearSession() {
+  delete api.defaults.headers.common['X-Session-Token'];
+  delete api.defaults.headers.common['X-Api-Key'];
+}
+
+/** Solo para el primer login — envía la API key UNA vez al endpoint de sesión. */
+function buildLoginClient() {
+  return axios.create({
+    baseURL: BASE_URL,
+    timeout: 10000,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export const authApi = {
+  /**
+   * Intercambia la API Key por un session token.
+   * La API key viaja en este único request y nunca se almacena.
+   */
+  login: (apiKey: string) =>
+    buildLoginClient().post<{ sessionToken: string; expiresAt: string; tenant: { id: string; nombre: string } }>(
+      '/auth/session',
+      {},
+      { headers: { 'X-Api-Key': apiKey } },
+    ),
+};
 
 export interface Viaje {
   id: string; tenantId: string; numeroPlaca: string; nombreConductor: string;
