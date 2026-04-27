@@ -56,6 +56,17 @@ export class DefaultValuesDto {
   @ApiPropertyOptional({ example: 0 })    @IsOptional() @IsInt() @Type(() => Number) dec_persona_politica?: number;
   @ApiPropertyOptional({ example: 1 })    @IsOptional() @IsInt() @Type(() => Number) dec_term_y_cod?: number;
   @ApiPropertyOptional({ example: 'N' })  @IsOptional() @IsString() iplaca?: string;
+  @ApiPropertyOptional({ description: 'Serial de carrocería por defecto', example: 'SC1S6ZMV3024320' })
+  @IsOptional() @IsString() serial_carroceria?: string;
+  @ApiPropertyOptional({ description: 'Serial de motor por defecto' })
+  @IsOptional() @IsString() serial_motor?: string;
+  // Códigos de catálogo La Mundial para vehículo (si el tenant usa siempre la misma marca/modelo/versión)
+  @ApiPropertyOptional({ description: 'Código de marca La Mundial por defecto', example: '083' })
+  @IsOptional() @IsString() cmarca?: string;
+  @ApiPropertyOptional({ description: 'Código de modelo La Mundial por defecto', example: '001' })
+  @IsOptional() @IsString() cmodelo?: string;
+  @ApiPropertyOptional({ description: 'Código de versión La Mundial por defecto', example: '1' })
+  @IsOptional() @IsString() cversion?: string;
 }
 
 /**

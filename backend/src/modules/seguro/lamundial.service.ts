@@ -158,7 +158,8 @@ export class LaMundialService {
     const key = `${baseUrl}::${authToken ?? ''}`;
     if (!this.clientCache.has(key)) {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+      // La Mundial usa header "apikey" (minúsculas, sin Bearer)
+      if (authToken) headers['apikey'] = authToken;
 
       const client = axios.create({
         baseURL: baseUrl,
