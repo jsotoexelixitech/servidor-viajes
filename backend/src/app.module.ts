@@ -23,6 +23,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { RedisModule } from './common/redis/redis.module';
 import { SessionModule } from './common/session/session.module';
+import { EnvValidatorService } from './common/env-validator.service';
 
 @Module({
   imports: [
@@ -133,6 +134,8 @@ import { SessionModule } from './common/session/session.module';
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
     },
+    // Validación de variables de entorno al arrancar
+    EnvValidatorService,
   ],
 })
 export class AppModule {}
