@@ -3,7 +3,7 @@ import {
   UpdateDateColumn, Index, ManyToOne, JoinColumn,
 } from 'typeorm';
 import { Tenant } from '../../tenant/entities/tenant.entity';
-import { Vendedor } from '../../vendedor/entities/vendedor.entity';
+import { Conductor } from '../../conductor/entities/conductor.entity';
 
 export enum EstadoViaje {
   INICIADO = 'INICIADO',
@@ -17,7 +17,7 @@ export type EstadoPoliza = 'EMITIENDO' | 'ACTIVA' | 'FINALIZADA' | 'ERROR' | 'CR
 @Entity('viajes')
 @Index(['tenantId', 'estado'])
 @Index(['tenantId', 'creadoEn'])
-@Index(['tenantId', 'vendedorId'])
+@Index(['tenantId', 'conductorId'])
 export class Viaje {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -99,17 +99,15 @@ export class Viaje {
   @Column({ name: 'webhook_ultimo_error', type: 'text', nullable: true })
   webhookUltimoError: string;
 
-  // ─── Vendedor / asesor responsable ────────────────────────────────────────
-  @Column({ name: 'vendedor_id', type: 'uuid', nullable: true })
-  vendedorId: string | null;
+  // ─── Conductor responsable del viaje ──────────────────────────────────────
+  @Column({ name: 'conductor_id', type: 'uuid', nullable: true })
+  conductorId: string | null;
 
-  @ManyToOne(() => Vendedor, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'vendedor_id' })
-  vendedor: Vendedor;
+  @ManyToOne(() => Conductor, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'conductor_id' })
+  conductor: Conductor;
 
-  /** Snapshot del nombre del vendedor al momento de la operación */
-  @Column({ name: 'vendedor_nombre', type: 'varchar', length: 200, nullable: true })
-  vendedorNombre: string;
+  // (El campo nombreConductor existente arriba ya guarda el snapshot del nombre)
 
   // ─── Datos comerciales ────────────────────────────────────────────────────
   /** Tipo o plan de cobertura: RCVBAS, RUSPAT, etc. */

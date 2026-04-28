@@ -27,7 +27,7 @@ export const onDemoModeChange = (cb: (active: boolean) => void) => {
 };
 
 // ─── Estado en memoria (reset al recargar) ────────────────────────────────────
-type DemoVendedor = {
+type DemoConductor = {
   id: string;
   tenantId: string;
   nombre: string;
@@ -50,8 +50,7 @@ type DemoViaje = {
   polizaIntentos?: number; polizaUltimoIntento?: string;
   webhookEnviado: boolean; webhookIntentos: number; creadoEn: string;
   metadata?: Record<string, unknown>;
-  vendedorId?: string | null;
-  vendedorNombre?: string;
+  conductorId?: string | null;
   planPoliza?: string;
   prima?: number;
   primaExt?: number;
@@ -79,7 +78,7 @@ const DEMO_TENANT_DATOS = {
 };
 
 let viajes: DemoViaje[] = [];
-let vendedores: DemoVendedor[] = [];
+let conductores: DemoConductor[] = [];
 let tenants: DemoTenant[] = [];
 let seguroConfig: Record<string, unknown> = {};
 let fieldMappings: Record<string, string> = {};
@@ -126,14 +125,14 @@ function seedDemoData() {
     correo_tomador: 'demo@cliente.com',
   };
 
-  // ── Vendedores demo (asesores comerciales del tenant) ──────────────────
-  vendedores = [
-    mkVendedor('Daniel',  'Castro',   'V25221952', '+584241829583', 'daniel.castro@taxisexpress.com', 12.5),
-    mkVendedor('Andrea',  'Vargas',   'V18556321', '+584142587412', 'andrea.vargas@taxisexpress.com', 12.5),
-    mkVendedor('Miguel',  'Torres',   'V21887455', '+584125698744', 'miguel.torres@taxisexpress.com', 10.0),
-    mkVendedor('Valeria', 'Sánchez',  'V19887412', '+584241236547', 'valeria.sanchez@taxisexpress.com', 11.0),
-    mkVendedor('Eduardo', 'Romero',   'V17554896', '+584145896325', 'eduardo.romero@taxisexpress.com', 10.0),
-    mkVendedor('Luis',    'Hernández','V22885566', '+584122587413', 'luis.hernandez@taxisexpress.com',  9.5),
+  // ── Conductores demo (flota del tenant) ─────────────────────────────────
+  conductores = [
+    mkConductor('Daniel',  'Castro',   'V25221952', '+584241829583', 'daniel.castro@taxisexpress.com', 12.5),
+    mkConductor('Andrea',  'Vargas',   'V18556321', '+584142587412', 'andrea.vargas@taxisexpress.com', 12.5),
+    mkConductor('Miguel',  'Torres',   'V21887455', '+584125698744', 'miguel.torres@taxisexpress.com', 10.0),
+    mkConductor('Valeria', 'Sánchez',  'V19887412', '+584241236547', 'valeria.sanchez@taxisexpress.com', 11.0),
+    mkConductor('Eduardo', 'Romero',   'V17554896', '+584145896325', 'eduardo.romero@taxisexpress.com', 10.0),
+    mkConductor('Luis',    'Hernández','V22885566', '+584122587413', 'luis.hernandez@taxisexpress.com',  9.5),
   ];
 
   // ── Otros tenants (cartera de la empresa contratante, vista admin) ─────
@@ -145,36 +144,38 @@ function seedDemoData() {
     { id: 'demo-tenant-0005', nombre: 'Pidedirecto Logística',   activo: false, createdAt: dayOffset(-40) },
   ];
 
-  // ── Histórico de viajes con vendedor, prima y comisión ─────────────────
-  // Distribuyo los viajes entre los vendedores para mostrar ranking realista
-  const v = vendedores;
+  // ── Histórico de viajes con conductor, prima y comisión ────────────────
+  // Cada conductor ejecuta el viaje y se le asigna la comisión de la póliza emitida.
+  // Distribuyo los viajes entre los conductores para mostrar ranking realista.
+  // Nota: el "conductor" del payload (nombreConductor) es el mismo que el del registro.
+  const c = conductores;
   viajes = [
-    // Daniel Castro — top performer
-    crearViajeDemo({ placa:'AB123CD', conductor:'Carlos Rodríguez', modelo:'Toyota Corolla',  anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0030', cnrecibo:'REC-DEMO-0030', vendedor:v[0], plan:'RCVBAS', prima:485,    offset:-1000*60*60*24*7 }),
-    crearViajeDemo({ placa:'EF456GH', conductor:'María González',   modelo:'Chevrolet Aveo',  anio:'2018', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0031', cnrecibo:'REC-DEMO-0031', vendedor:v[0], plan:'RUSPAT', prima:1240,   offset:-1000*60*60*24*5 }),
-    crearViajeDemo({ placa:'IJ789KL', conductor:'José Pérez',       modelo:'Ford Fiesta',     anio:'2019', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0032', cnrecibo:'REC-DEMO-0032', vendedor:v[0], plan:'RCVBAS', prima:512,    offset:-1000*60*60*24*4 }),
-    crearViajeDemo({ placa:'X1Y2Z3', conductor:'Roberto Núñez',     modelo:'Toyota Hilux',    anio:'2022', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0040', cnrecibo:'REC-DEMO-0040', vendedor:v[0], plan:'RUSPAT', prima:1890,   offset:-1000*60*60*24*3 }),
+    // Daniel Castro — top performer (4 viajes históricos + 1 activo)
+    crearViajeDemo({ placa:'AB123CD', modelo:'Toyota Corolla',  anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0030', cnrecibo:'REC-DEMO-0030', conductor:c[0], plan:'RCVBAS', prima:485,    offset:-1000*60*60*24*7 }),
+    crearViajeDemo({ placa:'EF456GH', modelo:'Chevrolet Aveo',  anio:'2018', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0031', cnrecibo:'REC-DEMO-0031', conductor:c[0], plan:'RUSPAT', prima:1240,   offset:-1000*60*60*24*5 }),
+    crearViajeDemo({ placa:'IJ789KL', modelo:'Ford Fiesta',     anio:'2019', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0032', cnrecibo:'REC-DEMO-0032', conductor:c[0], plan:'RCVBAS', prima:512,    offset:-1000*60*60*24*4 }),
+    crearViajeDemo({ placa:'X1Y2Z3',  modelo:'Toyota Hilux',    anio:'2022', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0040', cnrecibo:'REC-DEMO-0040', conductor:c[0], plan:'RUSPAT', prima:1890,   offset:-1000*60*60*24*3 }),
     // Andrea Vargas
-    crearViajeDemo({ placa:'MN012OP', conductor:'Ana Martínez',     modelo:'Hyundai Accent',  anio:'2021', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0033', cnrecibo:'REC-DEMO-0033', vendedor:v[1], plan:'RCVBAS', prima:495,    offset:-1000*60*60*24*4 }),
-    crearViajeDemo({ placa:'PT112FG', conductor:'Susana Romero',    modelo:'Renault Sandero', anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0041', cnrecibo:'REC-DEMO-0041', vendedor:v[1], plan:'RCVBAS', prima:485,    offset:-1000*60*60*24*2 }),
-    crearViajeDemo({ placa:'QR345ST', conductor:'Luis Hernández',   modelo:'Renault Logan',   anio:'2022', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0034', cnrecibo:'REC-DEMO-0034', vendedor:v[1], plan:'RUSPAT', prima:1380,   offset:-1000*60*60*24 }),
+    crearViajeDemo({ placa:'MN012OP', modelo:'Hyundai Accent',  anio:'2021', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0033', cnrecibo:'REC-DEMO-0033', conductor:c[1], plan:'RCVBAS', prima:495,    offset:-1000*60*60*24*4 }),
+    crearViajeDemo({ placa:'PT112FG', modelo:'Renault Sandero', anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0041', cnrecibo:'REC-DEMO-0041', conductor:c[1], plan:'RCVBAS', prima:485,    offset:-1000*60*60*24*2 }),
+    crearViajeDemo({ placa:'QR345ST', modelo:'Renault Logan',   anio:'2022', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0034', cnrecibo:'REC-DEMO-0034', conductor:c[1], plan:'RUSPAT', prima:1380,   offset:-1000*60*60*24 }),
     // Miguel Torres
-    crearViajeDemo({ placa:'UV678WX', conductor:'Patricia Silva',   modelo:'Nissan Sentra',   anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0035', cnrecibo:'REC-DEMO-0035', vendedor:v[2], plan:'RCVBAS', prima:498,    offset:-1000*60*60*18 }),
-    crearViajeDemo({ placa:'YZ901AB', conductor:'Roberto Mendoza',  modelo:'Kia Picanto',     anio:'2019', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0036', cnrecibo:'REC-DEMO-0036', vendedor:v[2], plan:'RCVBAS', prima:475,    offset:-1000*60*60*12 }),
+    crearViajeDemo({ placa:'UV678WX', modelo:'Nissan Sentra',   anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0035', cnrecibo:'REC-DEMO-0035', conductor:c[2], plan:'RCVBAS', prima:498,    offset:-1000*60*60*18 }),
+    crearViajeDemo({ placa:'YZ901AB', modelo:'Kia Picanto',     anio:'2019', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0036', cnrecibo:'REC-DEMO-0036', conductor:c[2], plan:'RCVBAS', prima:475,    offset:-1000*60*60*12 }),
     // Valeria Sánchez
-    crearViajeDemo({ placa:'JK556LM', conductor:'Carmen Díaz',      modelo:'Chery QQ',        anio:'2018', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0042', cnrecibo:'REC-DEMO-0042', vendedor:v[3], plan:'RCVBAS', prima:445,    offset:-1000*60*60*8 }),
+    crearViajeDemo({ placa:'JK556LM', modelo:'Chery QQ',        anio:'2018', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0042', cnrecibo:'REC-DEMO-0042', conductor:c[3], plan:'RCVBAS', prima:445,    offset:-1000*60*60*8 }),
     // Eduardo Romero — viaje activo
-    crearViajeDemo({ placa:'CD234EF', conductor:'Sofía Ramírez',    modelo:'Toyota Yaris',    anio:'2021', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0037', cnrecibo:'REC-DEMO-0037', vendedor:v[4], plan:'RCVBAS', prima:495,    offset:-1000*60*8 }),
+    crearViajeDemo({ placa:'CD234EF', modelo:'Toyota Yaris',    anio:'2021', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0037', cnrecibo:'REC-DEMO-0037', conductor:c[4], plan:'RCVBAS', prima:495,    offset:-1000*60*8 }),
     // Luis Hernández — viaje activo
-    crearViajeDemo({ placa:'BR997TY', conductor:'Mario Olivares',   modelo:'Toyota Camry',    anio:'2023', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0043', cnrecibo:'REC-DEMO-0043', vendedor:v[5], plan:'RUSPAT', prima:1690,   offset:-1000*60*15 }),
+    crearViajeDemo({ placa:'BR997TY', modelo:'Toyota Camry',    anio:'2023', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0043', cnrecibo:'REC-DEMO-0043', conductor:c[5], plan:'RUSPAT', prima:1690,   offset:-1000*60*15 }),
     // Daniel Castro — viaje activo (otro)
-    crearViajeDemo({ placa:'TR332BV', conductor:'Gabriela Mora',    modelo:'Nissan Versa',    anio:'2022', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0044', cnrecibo:'REC-DEMO-0044', vendedor:v[0], plan:'RCVBAS', prima:485,    offset:-1000*60*5 }),
+    crearViajeDemo({ placa:'TR332BV', modelo:'Nissan Versa',    anio:'2022', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0044', cnrecibo:'REC-DEMO-0044', conductor:c[0], plan:'RCVBAS', prima:485,    offset:-1000*60*5 }),
     // Un viaje con error de póliza para que el monitor muestre actividad
     {
       ...crearViajeDemo({
-        placa:'GH567IK', conductor:'Pedro Ramos', modelo:'Suzuki Swift', anio:'2017',
+        placa:'GH567IK', modelo:'Suzuki Swift', anio:'2017',
         estado:'EN_CURSO', estadoPoliza:'EMITIENDO',
-        vendedor:v[2], plan:'RCVBAS', prima:0,
+        conductor:c[2], plan:'RCVBAS', prima:0,
         offset:-1000*60*18,
       }),
       cnpoliza: undefined,
@@ -192,9 +193,9 @@ function dayOffset(days: number): string {
   return new Date(Date.now() + days * 86400000).toISOString();
 }
 
-function mkVendedor(nombre: string, apellido: string, cedula: string, telefono: string, email: string, comision: number): DemoVendedor {
+function mkConductor(nombre: string, apellido: string, cedula: string, telefono: string, email: string, comision: number): DemoConductor {
   return {
-    id: 'vd-' + cedula.toLowerCase(),
+    id: 'cd-' + cedula.toLowerCase(),
     tenantId: DEMO_TENANT_ID,
     nombre, apellido, cedula, telefono, email,
     porcentajeComision: comision,
@@ -204,20 +205,24 @@ function mkVendedor(nombre: string, apellido: string, cedula: string, telefono: 
 }
 
 function crearViajeDemo(p: {
-  placa: string; conductor: string; modelo: string; anio: string;
+  placa: string; modelo: string; anio: string;
   estado: string; estadoPoliza?: string; cnpoliza?: string; cnrecibo?: string;
   offset: number;
-  vendedor?: DemoVendedor;
+  conductor?: DemoConductor;
+  /** Permite sobrescribir el nombre del conductor (cuando viene del payload del integrador) */
+  nombreConductor?: string;
   plan?: string;
   prima?: number;
 }): DemoViaje {
   const id = 'demo-' + Math.random().toString(36).slice(2, 10);
   const prima = p.prima ?? 0;
-  const comisionPct = p.vendedor?.porcentajeComision ?? 10;
+  const comisionPct = p.conductor?.porcentajeComision ?? 10;
   const comision = Math.round((prima * comisionPct) / 100 * 100) / 100;
+  const nombre = p.nombreConductor
+    ?? (p.conductor ? `${p.conductor.nombre} ${p.conductor.apellido}` : 'Sin asignar');
   return {
     id, tenantId: DEMO_TENANT_ID,
-    numeroPlaca: p.placa, nombreConductor: p.conductor,
+    numeroPlaca: p.placa, nombreConductor: nombre,
     modeloVehiculo: p.modelo, anioVehiculo: p.anio,
     latInicio: 10.4806, lngInicio: -66.9036,
     latDestino: 10.4906, lngDestino: -66.8936,
@@ -228,8 +233,7 @@ function crearViajeDemo(p: {
     webhookEnviado: !!p.cnpoliza, webhookIntentos: p.cnpoliza ? 1 : 0,
     creadoEn: new Date(Date.now() + p.offset).toISOString(),
     metadata: { demo: true },
-    vendedorId: p.vendedor?.id ?? null,
-    vendedorNombre: p.vendedor ? `${p.vendedor.nombre} ${p.vendedor.apellido}` : undefined,
+    conductorId: p.conductor?.id ?? null,
     planPoliza: p.plan ?? 'RCVBAS',
     prima,
     primaExt: prima > 0 ? Math.round((prima / 36.5) * 100) / 100 : 0,
@@ -264,17 +268,17 @@ function calcularKpis(list: DemoViaje[]) {
 
 function calcularRanking(list: DemoViaje[], metrica: 'viajes' | 'prima' | 'comision') {
   const map = new Map<string, {
-    vendedorId: string | null; nombre: string; cedula: string;
+    conductorId: string | null; nombre: string; cedula: string;
     totalViajes: number; viajesActivos: number;
     primaGenerada: number; comisionGenerada: number;
   }>();
   for (const v of list) {
-    const key = v.vendedorId ?? '__sin__';
-    const vd = vendedores.find(x => x.id === v.vendedorId);
-    const nombre = vd ? `${vd.nombre} ${vd.apellido}` : (v.vendedorNombre ?? 'Sin asignar');
-    const cedula = vd?.cedula ?? '-';
+    const key = v.conductorId ?? '__sin__';
+    const cd = conductores.find(x => x.id === v.conductorId);
+    const nombre = cd ? `${cd.nombre} ${cd.apellido}` : (v.nombreConductor ?? 'Sin asignar');
+    const cedula = cd?.cedula ?? '-';
     const cur = map.get(key) ?? {
-      vendedorId: v.vendedorId ?? null, nombre, cedula,
+      conductorId: v.conductorId ?? null, nombre, cedula,
       totalViajes: 0, viajesActivos: 0,
       primaGenerada: 0, comisionGenerada: 0,
     };
@@ -341,14 +345,14 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
     const cnpoliza = `POL-DEMO-${String(polizaCounter).padStart(4, '0')}`;
     const cnrecibo = `REC-DEMO-${String(polizaCounter).padStart(4, '0')}`;
 
-    // Asigna vendedor: si vino vendedorId/cedula úsalo, si no rota
-    let vendedor: DemoVendedor | undefined;
-    const vendedorIdent = String(b.vendedorId ?? b.vendedor_cedula ?? '').trim();
-    if (vendedorIdent) {
-      vendedor = vendedores.find(v => v.id === vendedorIdent || v.cedula === vendedorIdent);
+    // Asigna conductor: si vino conductorId / cedula úsalo, si no rota
+    let conductor: DemoConductor | undefined;
+    const conductorIdent = String(b.conductorId ?? b.conductor_cedula ?? b.cedula ?? '').trim();
+    if (conductorIdent) {
+      conductor = conductores.find(c => c.id === conductorIdent || c.cedula === conductorIdent);
     }
-    if (!vendedor && vendedores.length > 0) {
-      vendedor = vendedores[viajes.length % vendedores.length];
+    if (!conductor && conductores.length > 0) {
+      conductor = conductores[viajes.length % conductores.length];
     }
 
     // Prima realista según plan (RCVBAS ~ 480-520 Bs · RUSPAT ~ 1200-1900 Bs)
@@ -357,12 +361,13 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
       : Math.round(470 + Math.random() * 60);
 
     const v = crearViajeDemo({
-      placa, conductor: fullName,
+      placa,
       modelo, anio,
       estado: 'EN_CURSO', estadoPoliza: 'ACTIVA',
       cnpoliza, cnrecibo,
       offset: 0,
-      vendedor,
+      conductor,
+      nombreConductor: fullName, // respeta el nombre que vino en el payload
       plan: planSel,
       prima,
     });
@@ -469,15 +474,15 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
     }));
   }
 
-  // ── Vendedores (CRUD) ─────────────────────────────────────────────────────
-  if (method === 'get' && path.startsWith('vendedores')) {
+  // ── Conductores (CRUD) ────────────────────────────────────────────────────
+  if (method === 'get' && path.startsWith('conductores')) {
     const soloActivos = path.includes('soloActivos=true');
-    return soloActivos ? vendedores.filter(v => v.estado === 'ACTIVO') : vendedores;
+    return soloActivos ? conductores.filter(c => c.estado === 'ACTIVO') : conductores;
   }
-  if (method === 'post' && path === 'vendedores') {
-    const b = (body as Partial<DemoVendedor>) ?? {};
-    const nuevo: DemoVendedor = {
-      id: 'vd-' + Math.random().toString(36).slice(2, 10),
+  if (method === 'post' && path === 'conductores') {
+    const b = (body as Partial<DemoConductor>) ?? {};
+    const nuevo: DemoConductor = {
+      id: 'cd-' + Math.random().toString(36).slice(2, 10),
       tenantId: DEMO_TENANT_ID,
       nombre: b.nombre ?? 'Nuevo',
       apellido: b.apellido ?? '',
@@ -488,20 +493,20 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
       estado: 'ACTIVO',
       creadoEn: new Date().toISOString(),
     };
-    vendedores.unshift(nuevo);
+    conductores.unshift(nuevo);
     return nuevo;
   }
-  if (method === 'put' && path.startsWith('vendedores/')) {
+  if (method === 'put' && path.startsWith('conductores/')) {
     const id = path.split('/')[1];
-    const v = vendedores.find(x => x.id === id);
-    if (!v) throw { response: { status: 404, data: { message: 'Vendedor no encontrado.' } } };
-    Object.assign(v, body);
-    return v;
+    const c = conductores.find(x => x.id === id);
+    if (!c) throw { response: { status: 404, data: { message: 'Conductor no encontrado.' } } };
+    Object.assign(c, body);
+    return c;
   }
-  if (method === 'delete' && path.startsWith('vendedores/')) {
+  if (method === 'delete' && path.startsWith('conductores/')) {
     const id = path.split('/')[1];
-    const v = vendedores.find(x => x.id === id);
-    if (v) v.estado = 'INACTIVO';
+    const c = conductores.find(x => x.id === id);
+    if (c) c.estado = 'INACTIVO';
     return { ok: true };
   }
 
@@ -510,14 +515,14 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
     return calcularKpis(viajes);
   }
 
-  if (method === 'get' && path.startsWith('dashboard/vendedores/ranking')) {
+  if (method === 'get' && path.startsWith('dashboard/conductores/ranking')) {
     const params = new URLSearchParams(path.split('?')[1] ?? '');
     const metrica = (params.get('metrica') as 'viajes' | 'prima' | 'comision') ?? 'prima';
     const limit = parseInt(params.get('limit') ?? '10', 10);
     return calcularRanking(viajes, metrica).slice(0, limit);
   }
 
-  if (method === 'get' && path === 'dashboard/vendedores/en-curso') {
+  if (method === 'get' && path === 'dashboard/conductores/en-curso') {
     const activos = viajes.filter(v => v.estado === 'EN_CURSO' || v.estado === 'INICIADO');
     return calcularRanking(activos, 'viajes');
   }
@@ -527,7 +532,7 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
     return {
       ...k,
       totalTenants: tenants.filter(t => t.activo).length,
-      totalVendedores: vendedores.filter(v => v.estado === 'ACTIVO').length,
+      totalConductores: conductores.filter(c => c.estado === 'ACTIVO').length,
     };
   }
 
@@ -617,42 +622,46 @@ export const DEMO_INFO = {
  * Se calcula on-the-fly con un nuevo conductor/placa cada vez que se llama.
  */
 export function buildDemoViajeBody(): Record<string, unknown> {
-  const conductores = [
+  // Flota disponible para muestrear (vehículo + conductor del payload)
+  const flota = [
     { n: 'Daniel', a: 'Castro', placa: 'GH456IJ', modelo: 'Toyota Corolla', anio: 2022, color: 'Blanco' },
     { n: 'Andrea', a: 'Vargas', placa: 'KL789MN', modelo: 'Hyundai i10', anio: 2021, color: 'Rojo' },
     { n: 'Miguel', a: 'Torres', placa: 'OP012QR', modelo: 'Chevrolet Spark', anio: 2020, color: 'Azul' },
     { n: 'Valeria', a: 'Sánchez', placa: 'ST345UV', modelo: 'Ford EcoSport', anio: 2023, color: 'Gris' },
     { n: 'Eduardo', a: 'Romero', placa: 'WX678YZ', modelo: 'Renault Kwid', anio: 2022, color: 'Negro' },
   ];
-  const c = conductores[Math.floor(Math.random() * conductores.length)];
+  const f = flota[Math.floor(Math.random() * flota.length)];
   const cedula = String(20000000 + Math.floor(Math.random() * 9999999));
-  const vendedorActivo = vendedores.find(v => v.estado === 'ACTIVO');
+  // Resuelve un conductor registrado del tenant (si existe) por nombre/apellido
+  const conductorRegistrado = conductores.find(
+    cd => cd.estado === 'ACTIVO' && cd.nombre === f.n && cd.apellido === f.a,
+  ) ?? conductores.find(cd => cd.estado === 'ACTIVO');
   return {
-    vendedor_cedula: vendedorActivo?.cedula ?? '',
-    placa: c.placa,
-    fano: c.anio,
+    conductor_cedula: conductorRegistrado?.cedula ?? '',
+    placa: f.placa,
+    fano: f.anio,
     cmarca: '083',
     cmodelo: '001',
     cversion: '03',
-    color: c.color,
+    color: f.color,
     serial_carroceria: 'SC1S6ZMV3024' + Math.floor(100 + Math.random() * 899),
     ccategoria_uso: 11,
     ntoneladas: 0,
-    nombre_tomador: c.n,
-    apellido_tomador: c.a,
+    nombre_tomador: f.n,
+    apellido_tomador: f.a,
     rif_tomador: cedula,
     tipo_cedula_tomador: 'V',
     fnac_tomador: '1990-05-15',
     telefono_tomador: '+58424' + Math.floor(1000000 + Math.random() * 8999999),
-    correo_tomador: `${c.n.toLowerCase()}.${c.a.toLowerCase()}@demo.com`,
+    correo_tomador: `${f.n.toLowerCase()}.${f.a.toLowerCase()}@demo.com`,
     estado_tomador: 1,
     ciudad_tomador: 128,
     direccion_tomador: 'Av. Principal, Caracas',
     sexo_tomador: 'M',
     estado_civil_tomador: 'S',
-    modeloVehiculo: c.modelo,
-    anioVehiculo: String(c.anio),
-    nombreConductor: `${c.n} ${c.a}`,
+    modeloVehiculo: f.modelo,
+    anioVehiculo: String(f.anio),
+    nombreConductor: `${f.n} ${f.a}`,
     latInicio: 10.4806,
     lngInicio: -66.9036,
     latDestino: 10.4906,

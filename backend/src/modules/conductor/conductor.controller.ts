@@ -3,27 +3,27 @@ import {
   Query, UseGuards, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiSecurity } from '@nestjs/swagger';
-import { VendedorService } from './vendedor.service';
-import { CrearVendedorDto } from './dto/crear-vendedor.dto';
+import { ConductorService } from './conductor.service';
+import { CrearConductorDto } from './dto/crear-conductor.dto';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { Tenant } from '../tenant/entities/tenant.entity';
 
-@ApiTags('Vendedores')
+@ApiTags('Conductores')
 @ApiSecurity('api-key')
 @UseGuards(TenantGuard)
-@Controller('vendedores')
-export class VendedorController {
-  constructor(private readonly svc: VendedorService) {}
+@Controller('conductores')
+export class ConductorController {
+  constructor(private readonly svc: ConductorService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Registrar un vendedor' })
-  crear(@CurrentTenant() tenant: Tenant, @Body() dto: CrearVendedorDto) {
+  @ApiOperation({ summary: 'Registrar un conductor' })
+  crear(@CurrentTenant() tenant: Tenant, @Body() dto: CrearConductorDto) {
     return this.svc.crear(tenant.id, dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar vendedores del tenant' })
+  @ApiOperation({ summary: 'Listar conductores del tenant' })
   listar(
     @CurrentTenant() tenant: Tenant,
     @Query('soloActivos') soloActivos?: string,
@@ -32,24 +32,24 @@ export class VendedorController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Obtener vendedor por id' })
+  @ApiOperation({ summary: 'Obtener conductor por id' })
   obtener(@CurrentTenant() tenant: Tenant, @Param('id') id: string) {
     return this.svc.obtener(tenant.id, id);
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Actualizar vendedor' })
+  @ApiOperation({ summary: 'Actualizar conductor' })
   actualizar(
     @CurrentTenant() tenant: Tenant,
     @Param('id') id: string,
-    @Body() dto: Partial<CrearVendedorDto>,
+    @Body() dto: Partial<CrearConductorDto>,
   ) {
     return this.svc.actualizar(tenant.id, id, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Desactivar vendedor (soft delete)' })
+  @ApiOperation({ summary: 'Desactivar conductor (soft delete)' })
   eliminar(@CurrentTenant() tenant: Tenant, @Param('id') id: string) {
     return this.svc.eliminar(tenant.id, id);
   }

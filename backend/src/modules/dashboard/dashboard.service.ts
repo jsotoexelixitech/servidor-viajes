@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Viaje, EstadoViaje } from '../viaje/entities/viaje.entity';
-import { Vendedor, EstadoVendedor } from '../vendedor/entities/vendedor.entity';
+import { Conductor, EstadoConductor } from '../conductor/entities/conductor.entity';
 import { Tenant } from '../tenant/entities/tenant.entity';
 
 export interface DashboardKpis {
@@ -17,8 +17,8 @@ export interface DashboardKpis {
   ticketPromedio: number;
 }
 
-export interface RankingVendedor {
-  vendedorId: string | null;
+export interface RankingConductor {
+  conductorId: string | null;
   nombre: string;
   cedula: string;
   totalViajes: number;
@@ -31,7 +31,7 @@ export interface RankingVendedor {
 export class DashboardService {
   constructor(
     @InjectRepository(Viaje) private readonly viajeRepo: Repository<Viaje>,
-    @InjectRepository(Vendedor) private readonly vendedorRepo: Repository<Vendedor>,
+    @InjectRepository(Conductor) private readonly conductorRepo: Repository<Conductor>,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
   ) {}
 
@@ -84,12 +84,12 @@ export class DashboardService {
     };
   }
 
-  // ─── Ranking de vendedores por tenant ────────────────────────────────────
-  async rankingVendedores(
+  // ─── Ranking de conductores por tenant ───────────────────────────────────
+  async rankingConductores(
     tenantId: string,
     metrica: 'viajes' | 'prima' | 'comision' = 'prima',
     limit = 10,
-  ): Promise<RankingVendedor[]> {
+  ): Promise<RankingConductor[]> {
     const orderBy =
       metrica === 'viajes' ? 'totalViajes'
       : metrica === 'comision' ? 'comisionGenerada'
@@ -97,10 +97,10 @@ export class DashboardService {
 
     const rows = await this.viajeRepo
       .createQueryBuilder('v')
-      .leftJoin('v.vendedor', 'vd')
-      .select('v.vendedor_id', 'vendedorId')
-      .addSelect('COALESCE(vd.nombre, v.vendedorNombre, \'Sin asignar\')', 'nombre')
-      .addSelect('COALESCE(vd.cedula, \'-\')', 'cedula')
+      .leftJoin('v.conductor', 'cd')
+      .select('v.conductor_id', 'conductorId')
+      .addSelect('COALESCE(cd.nombre, v.nombreConductor, \'Sin asignar\')', 'nombre')
+      .addSelect('COALESCE(cd.cedula, \'-\')', 'cedula')
       .addSelect('COUNT(v.id)', 'totalViajes')
       .addSelect(
         `SUM(CASE WHEN v.estado IN ('INICIADO','EN_CURSO') THEN 1 ELSE 0 END)`,
@@ -109,16 +109,16 @@ export class DashboardService {
       .addSelect('COALESCE(SUM(v.prima), 0)', 'primaGenerada')
       .addSelect('COALESCE(SUM(v.comision), 0)', 'comisionGenerada')
       .where('v.tenantId = :tenantId', { tenantId })
-      .groupBy('v.vendedor_id')
-      .addGroupBy('vd.nombre')
-      .addGroupBy('vd.cedula')
-      .addGroupBy('v.vendedorNombre')
+      .groupBy('v.conductor_id')
+      .addGroupBy('cd.nombre')
+      .addGroupBy('cd.cedula')
+      .addGroupBy('v.nombreConductor')
       .orderBy(orderBy, 'DESC')
       .limit(limit)
       .getRawMany();
 
     return rows.map(r => ({
-      vendedorId: r.vendedorId ?? null,
+      conductorId: r.conductorId ?? null,
       nombre: r.nombre,
       cedula: r.cedula,
       totalViajes: parseInt(r.totalViajes, 10) || 0,
@@ -128,14 +128,14 @@ export class DashboardService {
     }));
   }
 
-  // ─── Vendedores en curso (haciendo viaje activo) ─────────────────────────
-  async vendedoresEnCurso(tenantId: string): Promise<RankingVendedor[]> {
+  // ─── Conductores en curso (haciendo viaje activo) ────────────────────────
+  async conductoresEnCurso(tenantId: string): Promise<RankingConductor[]> {
     const rows = await this.viajeRepo
       .createQueryBuilder('v')
-      .leftJoin('v.vendedor', 'vd')
-      .select('v.vendedor_id', 'vendedorId')
-      .addSelect('COALESCE(vd.nombre, v.vendedorNombre, \'Sin asignar\')', 'nombre')
-      .addSelect('COALESCE(vd.cedula, \'-\')', 'cedula')
+      .leftJoin('v.conductor', 'cd')
+      .select('v.conductor_id', 'conductorId')
+      .addSelect('COALESCE(cd.nombre, v.nombreConductor, \'Sin asignar\')', 'nombre')
+      .addSelect('COALESCE(cd.cedula, \'-\')', 'cedula')
       .addSelect('COUNT(v.id)', 'totalViajes')
       .addSelect('COUNT(v.id)', 'viajesActivos')
       .addSelect('COALESCE(SUM(v.prima), 0)', 'primaGenerada')
@@ -144,14 +144,14 @@ export class DashboardService {
       .andWhere('v.estado IN (:...activos)', {
         activos: [EstadoViaje.INICIADO, EstadoViaje.EN_CURSO],
       })
-      .groupBy('v.vendedor_id')
-      .addGroupBy('vd.nombre')
-      .addGroupBy('vd.cedula')
-      .addGroupBy('v.vendedorNombre')
+      .groupBy('v.conductor_id')
+      .addGroupBy('cd.nombre')
+      .addGroupBy('cd.cedula')
+      .addGroupBy('v.nombreConductor')
       .getRawMany();
 
     return rows.map(r => ({
-      vendedorId: r.vendedorId ?? null,
+      conductorId: r.conductorId ?? null,
       nombre: r.nombre,
       cedula: r.cedula,
       totalViajes: parseInt(r.totalViajes, 10) || 0,
@@ -163,11 +163,11 @@ export class DashboardService {
 
   // ─── KPIs globales (todos los tenants) — uso admin ────────────────────────
   async kpisGlobales(): Promise<
-    DashboardKpis & { totalTenants: number; totalVendedores: number }
+    DashboardKpis & { totalTenants: number; totalConductores: number }
   > {
     const totalTenants = await this.tenantRepo.count({ where: { activo: true } });
-    const totalVendedores = await this.vendedorRepo.count({
-      where: { estado: EstadoVendedor.ACTIVO },
+    const totalConductores = await this.conductorRepo.count({
+      where: { estado: EstadoConductor.ACTIVO },
     });
 
     const total = await this.viajeRepo.count();
@@ -201,7 +201,7 @@ export class DashboardService {
 
     return {
       totalTenants,
-      totalVendedores,
+      totalConductores,
       totalViajes: total,
       viajesActivos: activos,
       viajesFinalizados: finalizados,

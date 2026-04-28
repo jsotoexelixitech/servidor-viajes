@@ -20,28 +20,28 @@ export class DashboardController {
     return this.svc.kpisPorTenant(tenant.id);
   }
 
-  @Get('vendedores/ranking')
+  @Get('conductores/ranking')
   @ApiSecurity('api-key')
   @UseGuards(TenantGuard)
-  @ApiOperation({ summary: 'Ranking de vendedores por métrica' })
+  @ApiOperation({ summary: 'Ranking de conductores por métrica' })
   ranking(
     @CurrentTenant() tenant: Tenant,
     @Query('metrica') metrica: 'viajes' | 'prima' | 'comision' = 'prima',
     @Query('limit') limit?: string,
   ) {
-    return this.svc.rankingVendedores(
+    return this.svc.rankingConductores(
       tenant.id,
       metrica,
       limit ? parseInt(limit, 10) : 10,
     );
   }
 
-  @Get('vendedores/en-curso')
+  @Get('conductores/en-curso')
   @ApiSecurity('api-key')
   @UseGuards(TenantGuard)
-  @ApiOperation({ summary: 'Vendedores con viajes activos en este momento' })
+  @ApiOperation({ summary: 'Conductores con viajes activos en este momento' })
   enCurso(@CurrentTenant() tenant: Tenant) {
-    return this.svc.vendedoresEnCurso(tenant.id);
+    return this.svc.conductoresEnCurso(tenant.id);
   }
 
   // ── Endpoints admin (cartera y stats globales) ───────────────────────────

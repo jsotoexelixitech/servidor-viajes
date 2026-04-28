@@ -4,23 +4,23 @@ import {
 } from 'typeorm';
 import { Tenant } from '../../tenant/entities/tenant.entity';
 
-export enum EstadoVendedor {
+export enum EstadoConductor {
   ACTIVO = 'ACTIVO',
   INACTIVO = 'INACTIVO',
   SUSPENDIDO = 'SUSPENDIDO',
 }
 
 /**
- * Vendedor / asesor / agente comercial que ejecuta la suscripción de pólizas
- * de un tenant. Cada viaje queda asociado a un vendedor para fines de:
- *   - Cálculo de comisiones
- *   - Métricas de rendimiento (ranking, prima generada)
- *   - Trazabilidad de la operación
+ * Conductor del tenant — persona que ejecuta el viaje y para la cual se
+ * emite la póliza. Cada viaje queda asociado a un conductor para fines de:
+ *   - Cálculo de comisiones por viaje
+ *   - Métricas de rendimiento (top viajes, top prima, top comisiones)
+ *   - Trazabilidad operativa (conductores en curso)
  */
-@Entity('vendedores')
+@Entity('conductores')
 @Index(['tenantId', 'estado'])
 @Index(['tenantId', 'cedula'], { unique: true })
-export class Vendedor {
+export class Conductor {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -38,7 +38,7 @@ export class Vendedor {
   @Column({ type: 'varchar', length: 150, nullable: true })
   apellido: string;
 
-  /** Cédula o RIF del vendedor (único por tenant) */
+  /** Cédula o RIF del conductor (único por tenant) */
   @Column({ type: 'varchar', length: 30 })
   cedula: string;
 
@@ -60,12 +60,12 @@ export class Vendedor {
 
   @Column({
     type: 'enum',
-    enum: EstadoVendedor,
-    default: EstadoVendedor.ACTIVO,
+    enum: EstadoConductor,
+    default: EstadoConductor.ACTIVO,
   })
-  estado: EstadoVendedor;
+  estado: EstadoConductor;
 
-  /** Datos opcionales (zona, sucursal, etc.) */
+  /** Datos opcionales (zona, sucursal, licencia, etc.) */
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
 

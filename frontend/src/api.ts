@@ -63,15 +63,14 @@ export interface Viaje {
   estadoPoliza?: string; polizaError?: string;
   webhookEnviado: boolean; webhookIntentos: number; creadoEn: string;
   metadata?: Record<string, unknown>;
-  vendedorId?: string | null;
-  vendedorNombre?: string;
+  conductorId?: string | null;
   planPoliza?: string;
   prima?: number;
   primaExt?: number;
   comision?: number;
 }
 
-export interface Vendedor {
+export interface Conductor {
   id: string;
   tenantId: string;
   nombre: string;
@@ -98,11 +97,11 @@ export interface DashboardKpis {
 
 export interface KpisGlobales extends DashboardKpis {
   totalTenants: number;
-  totalVendedores: number;
+  totalConductores: number;
 }
 
-export interface RankingVendedor {
-  vendedorId: string | null;
+export interface RankingConductor {
+  conductorId: string | null;
   nombre: string;
   cedula: string;
   totalViajes: number;
@@ -229,21 +228,21 @@ export const tenantApi = {
   misPolizasCriticas: () => api.get('/viaje/mis-polizas-criticas'),
 };
 
-export const vendedorApi = {
+export const conductorApi = {
   listar:   (soloActivos = false) =>
-    api.get<Vendedor[]>(`/vendedores?soloActivos=${soloActivos}`),
-  crear:    (data: Omit<Vendedor, 'id' | 'tenantId' | 'creadoEn'>) =>
-    api.post<Vendedor>('/vendedores', data),
-  actualizar: (id: string, data: Partial<Vendedor>) =>
-    api.put<Vendedor>(`/vendedores/${id}`, data),
-  eliminar: (id: string) => api.delete(`/vendedores/${id}`),
+    api.get<Conductor[]>(`/conductores?soloActivos=${soloActivos}`),
+  crear:    (data: Omit<Conductor, 'id' | 'tenantId' | 'creadoEn'>) =>
+    api.post<Conductor>('/conductores', data),
+  actualizar: (id: string, data: Partial<Conductor>) =>
+    api.put<Conductor>(`/conductores/${id}`, data),
+  eliminar: (id: string) => api.delete(`/conductores/${id}`),
 };
 
 export const dashboardApi = {
   kpis: () => api.get<DashboardKpis>('/dashboard/kpis'),
   ranking: (metrica: 'viajes' | 'prima' | 'comision' = 'prima', limit = 10) =>
-    api.get<RankingVendedor[]>(`/dashboard/vendedores/ranking?metrica=${metrica}&limit=${limit}`),
-  enCurso: () => api.get<RankingVendedor[]>('/dashboard/vendedores/en-curso'),
+    api.get<RankingConductor[]>(`/dashboard/conductores/ranking?metrica=${metrica}&limit=${limit}`),
+  enCurso: () => api.get<RankingConductor[]>('/dashboard/conductores/en-curso'),
   global: (adminKey: string) =>
     adminClient.get<KpisGlobales>('/dashboard/admin/global', {
       headers: { 'X-Admin-Key': adminKey },

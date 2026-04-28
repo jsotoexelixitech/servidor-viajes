@@ -2,14 +2,14 @@ import React, { useState, useCallback, useEffect, useRef, FormEvent } from 'reac
 import toast, { Toaster } from 'react-hot-toast';
 import {
   authApi, setSessionToken, clearSession, viajeApi, tenantApi, adminApi,
-  dashboardApi, vendedorApi,
-  Viaje, Vendedor, DashboardKpis, KpisGlobales, RankingVendedor, CarteraCliente,
+  dashboardApi, conductorApi,
+  Viaje, Conductor, DashboardKpis, KpisGlobales, RankingConductor, CarteraCliente,
   CAMPOS_SEGURO, SeguroConfig, FRECUENCIAS, CampoSeguro,
 } from './api';
 import { setDemoMode, isDemoMode, DEMO_INFO, buildDemoViajeBody } from './demo';
 import { WelcomeSplash } from './WelcomeSplash';
 
-type Tab = 'dashboard' | 'setup' | 'mapeo' | 'viaje' | 'finalizar' | 'listar' | 'monitor' | 'vendedores' | 'cartera';
+type Tab = 'dashboard' | 'setup' | 'mapeo' | 'viaje' | 'finalizar' | 'listar' | 'monitor' | 'conductores' | 'cartera';
 type ReqStatus = 'idle' | 'loading' | 'success' | 'error';
 
 interface Notif {
@@ -696,7 +696,7 @@ export default function App() {
   const mappedCount  = Object.values(fieldMappings).filter(v => v?.trim()).length;
   const defaultCount = Object.values(defaultValues).filter(v => v?.trim()).length;
 
-  const NAV_REQUIRES_KEY = new Set<Tab>(['mapeo', 'viaje', 'finalizar', 'listar', 'monitor', 'vendedores']);
+  const NAV_REQUIRES_KEY = new Set<Tab>(['mapeo', 'viaje', 'finalizar', 'listar', 'monitor', 'conductores']);
   const navTo = (id: Tab) => {
     if (NAV_REQUIRES_KEY.has(id) && !apiKeySet) return;
     setTab(id); setReqStatus('idle'); setResponse(null);
@@ -717,9 +717,9 @@ export default function App() {
     { id: 'dashboard',  label: 'Dashboard',     icon: () => Ic.grid() },
     { id: 'cartera',    label: 'Cartera',       icon: () => Ic.shield() },
     { id: 'setup',      label: 'Nuevo Cliente', icon: () => Ic.plus() },
-    { id: 'mapeo',      label: 'Configuración', icon: () => Ic.gear(),  requiresKey: true },
-    { id: 'vendedores', label: 'Vendedores',    icon: () => Ic.users(), requiresKey: true },
-    { id: 'viaje',      label: 'Iniciar Viaje', icon: () => Ic.play(),  requiresKey: true },
+    { id: 'mapeo',       label: 'Configuración', icon: () => Ic.gear(),  requiresKey: true },
+    { id: 'conductores', label: 'Conductores',   icon: () => Ic.users(), requiresKey: true },
+    { id: 'viaje',       label: 'Iniciar Viaje', icon: () => Ic.play(),  requiresKey: true },
     { id: 'finalizar',  label: 'Finalizar',     icon: () => Ic.stop(),  requiresKey: true },
     { id: 'listar',     label: 'Viajes',        icon: () => Ic.rows(),  requiresKey: true },
     { id: 'monitor',    label: 'Monitor',       icon: () => Ic.pulse(), dot: true, requiresKey: true },
@@ -966,11 +966,11 @@ export default function App() {
             <CarteraPanel adminKey={adminKeyInput} setAdminKey={setAdminKeyInput} />
           )}
 
-          {/* ══ VENDEDORES ══ */}
-          {tab === 'vendedores' && apiKeySet && (
-            <VendedoresPanel pushNotif={pushNotif} />
+          {/* ══ CONDUCTORES ══ */}
+          {tab === 'conductores' && apiKeySet && (
+            <ConductoresPanel pushNotif={pushNotif} />
           )}
-          {tab === 'vendedores' && !apiKeySet && (
+          {tab === 'conductores' && !apiKeySet && (
             <div className="card p-10 text-center">
               <p className="text-sm font-bold text-slate-700 mb-2">Conecta tu API Key</p>
               <p className="text-xs text-slate-600">Esta sección requiere autenticación de cliente.</p>
@@ -1507,7 +1507,7 @@ export default function App() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//   DASHBOARD PANEL — KPIs por cliente, ranking de vendedores, en curso
+//   DASHBOARD PANEL — KPIs por cliente, ranking de conductores, en curso
 // ═════════════════════════════════════════════════════════════════════════════
 
 const fmtBs = (n: number) =>
@@ -1522,10 +1522,10 @@ function DashboardPanel({
   navTo: (t: Tab) => void;
 }) {
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
-  const [topPrima, setTopPrima] = useState<RankingVendedor[]>([]);
-  const [topViajes, setTopViajes] = useState<RankingVendedor[]>([]);
-  const [topComision, setTopComision] = useState<RankingVendedor[]>([]);
-  const [enCurso, setEnCurso] = useState<RankingVendedor[]>([]);
+  const [topPrima, setTopPrima] = useState<RankingConductor[]>([]);
+  const [topViajes, setTopViajes] = useState<RankingConductor[]>([]);
+  const [topComision, setTopComision] = useState<RankingConductor[]>([]);
+  const [enCurso, setEnCurso] = useState<RankingConductor[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
@@ -1575,7 +1575,7 @@ function DashboardPanel({
           <p className="text-sm font-bold text-slate-700 mb-1">No hay sesión activa</p>
           <p className="text-xs text-slate-600 mb-4">
             Conecta tu API Key en el header para ver los KPIs de tu cartera de viajes,
-            comisiones y vendedores.
+            comisiones y conductores.
           </p>
           <button onClick={() => navTo('setup')} className="btn-primary text-xs px-4 mx-auto inline-flex">
             {Ic.plus()} Crear nuevo cliente
@@ -1627,29 +1627,29 @@ function DashboardPanel({
             />
           </div>
 
-          {/* ─── Vendedores en curso ──────────────────────────────────── */}
+          {/* ─── Conductores en curso ─────────────────────────────────── */}
           {enCurso.length > 0 && (
             <div className="card p-5 sm:p-6 mb-5">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <p className="section-title flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  Vendedores en curso
+                  Conductores en curso
                 </p>
                 <span className="badge badge-yellow">{enCurso.length} activos</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {enCurso.map(v => (
-                  <div key={v.vendedorId ?? v.nombre}
+                {enCurso.map(c => (
+                  <div key={c.conductorId ?? c.nombre}
                     className="border border-slate-200 rounded-xl p-3 bg-gradient-to-br from-amber-50/40 to-white">
                     <div className="flex items-start gap-2.5">
                       <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 font-extrabold text-xs flex items-center justify-center shrink-0">
-                        {iniciales(v.nombre)}
+                        {iniciales(c.nombre)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800 truncate">{v.nombre}</p>
-                        <p className="text-[11px] text-slate-600 font-mono">{v.cedula}</p>
+                        <p className="text-sm font-bold text-slate-800 truncate">{c.nombre}</p>
+                        <p className="text-[11px] text-slate-600 font-mono">{c.cedula}</p>
                       </div>
-                      <span className="badge badge-yellow text-[10px]">{v.viajesActivos}</span>
+                      <span className="badge badge-yellow text-[10px]">{c.viajesActivos}</span>
                     </div>
                   </div>
                 ))}
@@ -1660,7 +1660,7 @@ function DashboardPanel({
           {/* ─── Rankings ─────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
             <RankingCard
-              titulo="Top vendedores por prima"
+              titulo="Top conductores por prima"
               icon={Ic.trend('w-4 h-4 text-white')}
               gradient="bg-gradient-to-br from-brand-700 to-brand-500"
               metricaLabel="Prima Bs"
@@ -1669,7 +1669,7 @@ function DashboardPanel({
               loading={loading}
             />
             <RankingCard
-              titulo="Top vendedores por viajes"
+              titulo="Top conductores por viajes"
               icon={Ic.trophy('w-4 h-4 text-white')}
               gradient="bg-gradient-to-br from-amber-600 to-amber-400"
               metricaLabel="Viajes"
@@ -1678,7 +1678,7 @@ function DashboardPanel({
               loading={loading}
             />
             <RankingCard
-              titulo="Top vendedores por comisión"
+              titulo="Top conductores por comisión"
               icon={Ic.cash('w-4 h-4 text-white')}
               gradient="bg-gradient-to-br from-emerald-600 to-emerald-400"
               metricaLabel="Comisión Bs"
@@ -1743,17 +1743,17 @@ function RankingCard({ titulo, icon, gradient, metricaLabel, data, metrica, load
   icon: React.ReactNode;
   gradient: string;
   metricaLabel: string;
-  data: RankingVendedor[];
+  data: RankingConductor[];
   metrica: 'viajes' | 'prima' | 'comision';
   loading: boolean;
 }) {
-  const valor = (v: RankingVendedor) =>
-    metrica === 'viajes' ? fmtInt(v.totalViajes)
-    : metrica === 'prima' ? fmtBs(v.primaGenerada)
-    : fmtBs(v.comisionGenerada);
+  const valor = (c: RankingConductor) =>
+    metrica === 'viajes' ? fmtInt(c.totalViajes)
+    : metrica === 'prima' ? fmtBs(c.primaGenerada)
+    : fmtBs(c.comisionGenerada);
   const max = Math.max(
     1,
-    ...data.map(v => metrica === 'viajes' ? v.totalViajes : metrica === 'prima' ? v.primaGenerada : v.comisionGenerada),
+    ...data.map(c => metrica === 'viajes' ? c.totalViajes : metrica === 'prima' ? c.primaGenerada : c.comisionGenerada),
   );
   return (
     <div className="card p-4 sm:p-5 flex flex-col">
@@ -1770,19 +1770,19 @@ function RankingCard({ titulo, icon, gradient, metricaLabel, data, metrica, load
         <p className="text-xs text-slate-600 py-6 text-center">Aún no hay datos</p>
       )}
       <div className="space-y-2.5">
-        {data.map((v, i) => {
-          const val = metrica === 'viajes' ? v.totalViajes : metrica === 'prima' ? v.primaGenerada : v.comisionGenerada;
+        {data.map((c, i) => {
+          const val = metrica === 'viajes' ? c.totalViajes : metrica === 'prima' ? c.primaGenerada : c.comisionGenerada;
           const pct = (val / max) * 100;
           return (
-            <div key={(v.vendedorId ?? '') + i}>
+            <div key={(c.conductorId ?? '') + i}>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-extrabold flex items-center justify-center shrink-0">
                     {i + 1}
                   </span>
-                  <span className="text-xs font-bold text-slate-800 truncate">{v.nombre}</span>
+                  <span className="text-xs font-bold text-slate-800 truncate">{c.nombre}</span>
                 </div>
-                <span className="text-[11px] font-extrabold tabular-nums text-slate-700 shrink-0">{valor(v)}</span>
+                <span className="text-[11px] font-extrabold tabular-nums text-slate-700 shrink-0">{valor(c)}</span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all"
@@ -1800,14 +1800,14 @@ function RankingCard({ titulo, icon, gradient, metricaLabel, data, metrica, load
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//   VENDEDORES PANEL — CRUD de vendedores del tenant
+//   CONDUCTORES PANEL — CRUD de conductores del tenant
 // ═════════════════════════════════════════════════════════════════════════════
 
-function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titulo: string, msg: string) => void }) {
-  const [list, setList] = useState<Vendedor[]>([]);
+function ConductoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titulo: string, msg: string) => void }) {
+  const [list, setList] = useState<Conductor[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Vendedor | null>(null);
+  const [editing, setEditing] = useState<Conductor | null>(null);
   const [form, setForm] = useState({
     nombre: '', apellido: '', cedula: '', telefono: '', email: '', porcentajeComision: 10,
   });
@@ -1815,10 +1815,10 @@ function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titul
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await vendedorApi.listar();
+      const r = await conductorApi.listar();
       setList(r.data);
     } catch {
-      pushNotif('error', 'Error', 'No se pudieron cargar los vendedores');
+      pushNotif('error', 'Error', 'No se pudieron cargar los conductores');
     } finally {
       setLoading(false);
     }
@@ -1836,11 +1836,11 @@ function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titul
     e.preventDefault();
     try {
       if (editing) {
-        await vendedorApi.actualizar(editing.id, form);
-        pushNotif('success', 'Vendedor actualizado', form.nombre);
+        await conductorApi.actualizar(editing.id, form);
+        pushNotif('success', 'Conductor actualizado', form.nombre);
       } else {
-        await vendedorApi.crear({ ...form, estado: 'ACTIVO' });
-        pushNotif('success', 'Vendedor creado', form.nombre);
+        await conductorApi.crear({ ...form, estado: 'ACTIVO' });
+        pushNotif('success', 'Conductor creado', form.nombre);
       }
       resetForm();
       load();
@@ -1849,24 +1849,24 @@ function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titul
     }
   };
 
-  const startEdit = (v: Vendedor) => {
-    setEditing(v);
+  const startEdit = (c: Conductor) => {
+    setEditing(c);
     setForm({
-      nombre: v.nombre,
-      apellido: v.apellido ?? '',
-      cedula: v.cedula,
-      telefono: v.telefono ?? '',
-      email: v.email ?? '',
-      porcentajeComision: v.porcentajeComision,
+      nombre: c.nombre,
+      apellido: c.apellido ?? '',
+      cedula: c.cedula,
+      telefono: c.telefono ?? '',
+      email: c.email ?? '',
+      porcentajeComision: c.porcentajeComision,
     });
     setShowForm(true);
   };
 
-  const desactivar = async (v: Vendedor) => {
-    if (!confirm(`¿Desactivar al vendedor ${v.nombre}?`)) return;
+  const desactivar = async (c: Conductor) => {
+    if (!confirm(`¿Desactivar al conductor ${c.nombre}?`)) return;
     try {
-      await vendedorApi.eliminar(v.id);
-      pushNotif('info', 'Vendedor desactivado', v.nombre);
+      await conductorApi.eliminar(c.id);
+      pushNotif('info', 'Conductor desactivado', c.nombre);
       load();
     } catch {
       pushNotif('error', 'Error', 'No se pudo desactivar');
@@ -1876,19 +1876,19 @@ function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titul
   return (
     <div className="animate-in">
       <PageHeader
-        title="Vendedores"
-        subtitle="Gestiona la fuerza comercial que suscribe pólizas"
+        title="Conductores"
+        subtitle="Gestiona los conductores que ejecutan los viajes y generan pólizas"
         action={
           <button onClick={() => { resetForm(); setShowForm(true); }}
             className="btn-primary h-9 text-xs px-3 flex items-center gap-1.5">
-            {Ic.plus()} Nuevo vendedor
+            {Ic.plus()} Nuevo conductor
           </button>
         }
       />
 
       {showForm && (
         <div className="card p-5 sm:p-6 mb-5">
-          <p className="section-title mb-4">{editing ? 'Editar vendedor' : 'Nuevo vendedor'}</p>
+          <p className="section-title mb-4">{editing ? 'Editar conductor' : 'Nuevo conductor'}</p>
           <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="label">Nombre *</label>
@@ -1926,7 +1926,7 @@ function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titul
             <div className="sm:col-span-2 lg:col-span-3 flex gap-2 justify-end">
               <button type="button" onClick={resetForm} className="btn-secondary text-xs px-4">Cancelar</button>
               <button type="submit" className="btn-primary text-xs px-4">
-                {editing ? 'Guardar cambios' : 'Crear vendedor'}
+                {editing ? 'Guardar cambios' : 'Crear conductor'}
               </button>
             </div>
           </form>
@@ -1937,14 +1937,14 @@ function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titul
         {loading && list.length === 0 ? (
           <div className="py-16 flex items-center justify-center"><Spinner size="lg" /></div>
         ) : list.length === 0 ? (
-          <EmptyState icon={Ic.users('w-6 h-6')} title="Sin vendedores"
-            sub="Agrega el primer vendedor de tu equipo comercial" />
+          <EmptyState icon={Ic.users('w-6 h-6')} title="Sin conductores"
+            sub="Agrega el primer conductor de tu flota" />
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Vendedor</th>
+                  <th>Conductor</th>
                   <th>Cédula</th>
                   <th className="hidden md:table-cell">Contacto</th>
                   <th>% Comisión</th>
@@ -1953,40 +1953,40 @@ function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titul
                 </tr>
               </thead>
               <tbody>
-                {list.map(v => (
-                  <tr key={v.id}>
+                {list.map(c => (
+                  <tr key={c.id}>
                     <td>
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 text-xs font-extrabold flex items-center justify-center shrink-0">
-                          {iniciales(`${v.nombre} ${v.apellido ?? ''}`)}
+                          {iniciales(`${c.nombre} ${c.apellido ?? ''}`)}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-800 truncate">{v.nombre} {v.apellido}</p>
-                          <p className="text-[11px] text-slate-600 truncate md:hidden">{v.email || v.telefono || '—'}</p>
+                          <p className="text-sm font-bold text-slate-800 truncate">{c.nombre} {c.apellido}</p>
+                          <p className="text-[11px] text-slate-600 truncate md:hidden">{c.email || c.telefono || '—'}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="font-mono text-xs">{v.cedula}</td>
+                    <td className="font-mono text-xs">{c.cedula}</td>
                     <td className="hidden md:table-cell text-xs text-slate-700">
-                      <div>{v.email || '—'}</div>
-                      <div className="text-slate-500">{v.telefono || '—'}</div>
+                      <div>{c.email || '—'}</div>
+                      <div className="text-slate-500">{c.telefono || '—'}</div>
                     </td>
-                    <td className="font-bold text-sm tabular-nums">{v.porcentajeComision} %</td>
+                    <td className="font-bold text-sm tabular-nums">{c.porcentajeComision} %</td>
                     <td>
                       <span className={
-                        v.estado === 'ACTIVO' ? 'badge badge-green'
-                        : v.estado === 'SUSPENDIDO' ? 'badge badge-yellow'
+                        c.estado === 'ACTIVO' ? 'badge badge-green'
+                        : c.estado === 'SUSPENDIDO' ? 'badge badge-yellow'
                         : 'badge badge-gray'
-                      }>{v.estado}</span>
+                      }>{c.estado}</span>
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => startEdit(v)}
+                        <button onClick={() => startEdit(c)}
                           className="text-xs text-brand-600 hover:text-brand-800 font-bold px-2 py-1">
                           Editar
                         </button>
-                        {v.estado === 'ACTIVO' && (
-                          <button onClick={() => desactivar(v)}
+                        {c.estado === 'ACTIVO' && (
+                          <button onClick={() => desactivar(c)}
                             className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1">
                             Desactivar
                           </button>
@@ -2067,7 +2067,7 @@ function CarteraPanel({ adminKey, setAdminKey }: { adminKey: string; setAdminKey
             gradient="gradient-brand"
             label="Clientes activos"
             value={fmtInt(global.totalTenants)}
-            sub={`${global.totalVendedores} vendedores`}
+            sub={`${global.totalConductores} conductores`}
             loading={false}
           />
           <KpiCard

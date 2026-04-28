@@ -3,10 +3,10 @@ import {
   Length, IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EstadoVendedor } from '../entities/vendedor.entity';
+import { EstadoConductor } from '../entities/conductor.entity';
 
-export class CrearVendedorDto {
-  @ApiProperty({ example: 'Daniel', description: 'Nombre del vendedor' })
+export class CrearConductorDto {
+  @ApiProperty({ example: 'Daniel', description: 'Nombre del conductor' })
   @IsString() @IsNotEmpty() @Length(1, 150)
   nombre: string;
 
@@ -30,7 +30,7 @@ export class CrearVendedorDto {
   @IsOptional() @IsNumber() @Min(0) @Max(100)
   porcentajeComision?: number;
 
-  @ApiPropertyOptional({ enum: EstadoVendedor, example: EstadoVendedor.ACTIVO })
-  @IsOptional() @IsEnum(EstadoVendedor)
-  estado?: EstadoVendedor;
+  @ApiPropertyOptional({ enum: EstadoConductor, example: EstadoConductor.ACTIVO })
+  @IsOptional() @IsEnum(EstadoConductor)
+  estado?: EstadoConductor;
 }
