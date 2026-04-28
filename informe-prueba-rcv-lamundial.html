@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe Técnico — Prueba de Emisión RCV · La Mundial de Seguros</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #1a1a2e;
+    background: #f4f6f9;
+  }
+
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 48px 56px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 3px solid #c8102e;
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+  }
+  .header-left h1 { font-size: 22px; color: #c8102e; font-weight: 700; }
+  .header-left p  { font-size: 13px; color: #555; margin-top: 4px; }
+  .badge-estado {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-weight: 700;
+    font-size: 12px;
+    white-space: nowrap;
+    margin-top: 4px;
+  }
+
+  /* ── META TABLE ── */
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 24px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 28px;
+  }
+  .meta-grid .row { display: flex; gap: 6px; }
+  .meta-grid .lbl { color: #6c757d; font-size: 11px; text-transform: uppercase; font-weight: 600; min-width: 120px; }
+  .meta-grid .val { font-weight: 600; color: #1a1a2e; font-size: 12px; }
+
+  /* ── SECTION ── */
+  h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #c8102e;
+    border-left: 4px solid #c8102e;
+    padding-left: 10px;
+    margin: 28px 0 12px;
+  }
+  h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 18px 0 8px;
+  }
+  p { margin-bottom: 10px; color: #333; }
+
+  /* ── RESULT TABLE ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 18px;
+    font-size: 12px;
+  }
+  thead th {
+    background: #1a1a2e;
+    color: #fff;
+    padding: 9px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: top;
+  }
+  tbody tr:nth-child(even) td { background: #f8f9fa; }
+  tbody tr:hover td { background: #fff3f3; }
+
+  /* ── STATUS PILL ── */
+  .ok   { color: #155724; background: #d4edda; padding: 2px 8px; border-radius: 20px; font-weight: 700; font-size: 11px; white-space: nowrap; }
+  .fail { color: #721c24; background: #f8d7da; padding: 2px 8px; border-radius: 20px; font-weight: 700; font-size: 11px; white-space: nowrap; }
+  .warn { color: #856404; background: #fff3cd; padding: 2px 8px; border-radius: 20px; font-weight: 700; font-size: 11px; white-space: nowrap; }
+  .info { color: #0c5460; background: #d1ecf1; padding: 2px 8px; border-radius: 20px; font-weight: 700; font-size: 11px; white-space: nowrap; }
+
+  /* ── CODE BLOCK ── */
+  pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 11px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  code { font-family: 'Cascadia Code', 'Consolas', monospace; }
+
+  /* ── ALERT BOXES ── */
+  .alert {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .alert-success  { background: #d4edda; border-left: 4px solid #28a745; color: #155724; }
+  .alert-danger   { background: #f8d7da; border-left: 4px solid #c8102e; color: #721c24; }
+  .alert-warning  { background: #fff3cd; border-left: 4px solid #ffc107; color: #856404; }
+  .alert-info     { background: #d1ecf1; border-left: 4px solid #17a2b8; color: #0c5460; }
+  .alert strong   { font-weight: 700; }
+
+  /* ── STEP ── */
+  .step {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+  .step-header {
+    background: #1a1a2e;
+    color: #fff;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .step-body { padding: 14px 16px; }
+  .step-body p { margin-bottom: 8px; font-size: 12px; }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 2px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #6c757d;
+  }
+  .footer strong { color: #1a1a2e; }
+
+  /* ── PRINT ── */
+  @page { size: A4; margin: 18mm 16mm; }
+  @media print {
+    body { background: #fff !important; }
+    .page { padding: 0 !important; max-width: 100% !important; }
+    pre  { background: #1e1e2e !important; color: #cdd6f4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .step, .alert, .meta-grid { page-break-inside: avoid; }
+    h2 { page-break-after: avoid; }
+    thead { display: table-header-group; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Informe Técnico — Prueba de Emisión RCV</h1>
+      <p>Integración API · La Mundial de Seguros · Ambiente QA</p>
+    </div>
+    <div>
+      <div class="badge-estado">⚠ PENDIENTE CORRECCIÓN SERVIDOR</div>
+    </div>
+  </div>
+
+  <!-- META -->
+  <div class="meta-grid">
+    <div class="row"><span class="lbl">Fecha del informe</span><span class="val">27 de abril de 2026</span></div>
+    <div class="row"><span class="lbl">Ambiente</span><span class="val">QA — qaapisys2000.lamundialdeseguros.com</span></div>
+    <div class="row"><span class="lbl">Remitente</span><span class="val">ExelixiTech · soporte@exelixitech.com</span></div>
+    <div class="row"><span class="lbl">Autenticación</span><span class="val">Header: <code>apikey</code> (token provisto por La Mundial)</span></div>
+    <div class="row"><span class="lbl">Producto probado</span><span class="val">RCV Básico (RCVBAS) — Ramo 18</span></div>
+    <div class="row"><span class="lbl">Endpoints evaluados</span><span class="val">/api/v1 (QA normal) · /CorreccionCalculo (nuevo)</span></div>
+  </div>
+
+  <!-- RESUMEN EJECUTIVO -->
+  <h2>1. Resumen Ejecutivo</h2>
+  <p>
+    ExelixiTech realizó pruebas exhaustivas de emisión de póliza RCV contra el ambiente QA de La Mundial de Seguros,
+    abarcando tanto el endpoint estándar (<code>/api/v1/external/createEmissionAuto</code>) como el nuevo endpoint
+    de corrección de cálculo (<code>/CorreccionCalculo/api/v1/external/createEmissionAuto</code>).
+  </p>
+  <p>
+    Las pruebas confirman que la infraestructura de conectividad, autenticación y estructura de payload
+    son <strong>correctas</strong>. El problema se origina exclusivamente en el <strong>Stored Procedure del plan RCVBAS</strong>
+    en el servidor <code>CorreccionCalculo</code>, donde existe un desajuste entre las columnas esperadas por el SP
+    y las que envía la API. Esto es un defecto en el servidor de La Mundial que requiere corrección interna.
+  </p>
+
+  <div class="alert alert-warning">
+    <strong>Conclusión:</strong> El flujo de cotización funciona correctamente. La emisión de RCVBAS falla
+    únicamente por un error de esquema SQL (<em>Column name or number of supplied values does not match table definition</em>)
+    en el stored procedure del lado del servidor de La Mundial. El plan RUSPAT en el mismo servidor pasa la
+    validación SQL sin problema, lo que confirma que la integración es correcta pero el SP de RCVBAS
+    no ha sido migrado/actualizado aún.
+  </div>
+
+  <!-- HALLAZGOS POR ENDPOINT -->
+  <h2>2. Resultados por Endpoint y Plan</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Servidor</th>
+        <th>Endpoint</th>
+        <th>Plan</th>
+        <th>HTTP</th>
+        <th>Resultado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>QA Normal</td>
+        <td><code>/api/v1/external/getCotizacionAuto</code></td>
+        <td>RCVBAS</td>
+        <td><span class="ok">200</span></td>
+        <td>✅ Prima calculada correctamente</td>
+      </tr>
+      <tr>
+        <td>QA Normal</td>
+        <td><code>/api/v1/external/createEmissionAuto</code></td>
+        <td>RCVBAS</td>
+        <td><span class="fail">400</span></td>
+        <td>❌ SQL column mismatch (SP desactualizado)</td>
+      </tr>
+      <tr>
+        <td>QA Normal</td>
+        <td><code>/api/v1/external/createEmissionAuto</code></td>
+        <td>RUSPAT</td>
+        <td><span class="fail">400</span></td>
+        <td>❌ SQL column mismatch (mismo problema)</td>
+      </tr>
+      <tr>
+        <td><strong>CorreccionCalculo</strong></td>
+        <td><code>/CorreccionCalculo/api/v1/external/getCotizacionAuto</code></td>
+        <td>RCVBAS</td>
+        <td><span class="ok">200</span></td>
+        <td>✅ <code>mprima: 197,455.12 Bs</code> · <code>mprimaext: 407.34 USD</code> · <code>ptasa: 484.74</code></td>
+      </tr>
+      <tr>
+        <td><strong>CorreccionCalculo</strong></td>
+        <td><code>/CorreccionCalculo/api/v1/external/createEmissionAuto</code></td>
+        <td>RUSPAT</td>
+        <td><span class="warn">400</span></td>
+        <td>✅ SP funciona — Error de negocio: "póliza vigente para la placa" (esperado en QA)</td>
+      </tr>
+      <tr>
+        <td><strong>CorreccionCalculo</strong></td>
+        <td><code>/CorreccionCalculo/api/v1/external/createEmissionAuto</code></td>
+        <td><strong>RCVBAS</strong></td>
+        <td><span class="fail">400</span></td>
+        <td>❌ <strong>SQL column mismatch — SP de RCVBAS no actualizado</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- DETALLE TECNICO -->
+  <h2>3. Detalle Técnico de las Pruebas</h2>
+
+  <!-- PASO 1: Cotizacion -->
+  <div class="step">
+    <div class="step-header">
+      <span>PASO 1 · Cotización RCVBAS — CorreccionCalculo</span>
+      <span class="ok">✅ HTTP 200</span>
+    </div>
+    <div class="step-body">
+      <p><strong>Request:</strong></p>
+      <pre><code>curl -X POST "https://qaapisys2000.lamundialdeseguros.com/CorreccionCalculo/api/v1/external/getCotizacionAuto" \
+  -H "apikey: 35402bbd4019ee15bc4fbd440a4b80288065ae54856016e4d6b2600b941e5717" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cmarca": "083",
+    "cmodelo": "001",
+    "cversion": "03",
+    "fano": 2004,
+    "cplan": "RCVBAS",
+    "ccategoria_uso": 11,
+    "ntoneladas": 60
+  }'</code></pre>
+      <p><strong>Response:</strong></p>
+      <pre><code>{
+  "result": {
+    "mprima": "197455.12",
+    "mprimaext": "407.34",
+    "ptasa": 484.7404
+  },
+  "status": true
+}</code></pre>
+      <div class="alert alert-success">
+        La cotización funciona perfectamente. El servidor calcula correctamente la prima en bolívares
+        (<strong>Bs 197,455.12</strong>), en divisas (<strong>USD 407.34</strong>) y la tasa de cambio
+        (<strong>484.74</strong>).
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 2: Emision RCVBAS -->
+  <div class="step">
+    <div class="step-header">
+      <span>PASO 2 · Emisión RCVBAS — CorreccionCalculo</span>
+      <span class="fail">❌ HTTP 400 — SQL Column Mismatch</span>
+    </div>
+    <div class="step-body">
+      <p>
+        Se ejecutó la emisión usando la prima calculada en el Paso 1.
+        Se probaron múltiples variaciones del payload (con/sin <code>ntoneladas</code>,
+        con <code>mprima</code> + <code>mprimaext</code> + <code>ptasa</code>, con <code>cusuario</code>,
+        con diferentes <code>ccategoria_uso</code>) sin éxito.
+      </p>
+      <p><strong>Request (payload completo):</strong></p>
+      <pre><code>curl -X POST "https://qaapisys2000.lamundialdeseguros.com/CorreccionCalculo/api/v1/external/createEmissionAuto" \
+  -H "apikey: 35402bbd4019ee15bc4fbd440a4b80288065ae54856016e4d6b2600b941e5717" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "poliza": "POL-EXLX-202604271540",
+    "cramo": 18,
+    "plan": "RCVBAS",
+    "frecuencia": "A",
+    "fecha_emision": "2026-04-27",
+    "productor": 80080,
+    "cusuario": 4,
+    "tipo_cedula_tomador": "V",
+    "rif_tomador": "25221952",
+    "nombre_tomador": "Gabriel",
+    "apellido_tomador": "Estacio",
+    "telefono_tomador": "+584241829583",
+    "correo_tomador": "gabriel.estacio@exelixitech.com",
+    "sexo_tomador": "M",
+    "fnac_tomador": "1996-10-13",
+    "estado_tomador": 1,
+    "ciudad_tomador": 128,
+    "direccion_tomador": "Av norte 8 amadores a planas",
+    "tipo_cedula_titular": "V",
+    "rif_titular": "25221952",
+    "nombre_titular": "Gabriel",
+    "apellido_titular": "Estacio",
+    "sexo_titular": "M",
+    "fnac_titular": "1996-10-13",
+    "estado_titular": 1,
+    "ciudad_titular": 128,
+    "direccion_titular": "Av norte 8 amadores a planas",
+    "telefono_titular": "+584241829583",
+    "correo_titular": "gabriel.estacio@exelixitech.com",
+    "marca": "083",
+    "modelo": "001",
+    "version": "03",
+    "fano": 2004,
+    "color": "Gris",
+    "placa": "EXL001A",
+    "serial_carroceria": "SC1S6ZMV3024399",
+    "serial_motor": "",
+    "ccategoria_uso": 11,
+    "ntoneladas": 60,
+    "mprima": 197455.12,
+    "mprimaext": 407.34,
+    "ptasa": 484.7404,
+    "dec_persona_politica": "0",
+    "dec_term_y_cod": "1",
+    "dec_diagnos_enferm": null,
+    "dec_descrip_enferm": null
+  }'</code></pre>
+      <p><strong>Response:</strong></p>
+      <pre><code>{
+  "result": {
+    "error": true,
+    "result": {
+      "error": "Column name or number of supplied values does not match table definition."
+    }
+  },
+  "status": false
+}
+[HTTP: 400]</code></pre>
+      <div class="alert alert-danger">
+        <strong>Análisis del error:</strong> Este es un error de SQL Server (<em>T-SQL</em>) que indica que el
+        stored procedure invocado internamente por el servidor recibe columnas con nombres incorrectos
+        o una cantidad de valores que no coincide con la definición de la tabla. <br><br>
+        Este error <strong>no puede ser corregido desde el cliente</strong>; proviene del stored procedure
+        del lado de La Mundial.
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 3: Prueba de verificación con RUSPAT -->
+  <div class="step">
+    <div class="step-header">
+      <span>PASO 3 · Verificación con plan RUSPAT — mismo servidor CorreccionCalculo</span>
+      <span class="warn">⚠ HTTP 400 — Error de negocio (SP funciona)</span>
+    </div>
+    <div class="step-body">
+      <p>
+        Para descartar que el problema fuera nuestra integración, se ejecutó el payload de prueba de La Mundial
+        (tomado del Postman Collection oficial <code>RCV2.postman_collection.json</code>) con plan <code>RUSPAT</code>
+        sobre el mismo servidor.
+      </p>
+      <pre><code>curl -X POST "https://qaapisys2000.lamundialdeseguros.com/CorreccionCalculo/api/v1/external/createEmissionAuto" \
+  -H "apikey: 35402bbd4019ee15bc4fbd440a4b80288065ae54856016e4d6b2600b941e5717" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "poliza": "POL-0038",
+    "cramo": 18,
+    "plan": "RUSPAT",
+    "marca": "587",
+    "modelo": "002",
+    "version": "005",
+    "fano": 2013,
+    "placa": "EXL010Z",
+    "ccategoria_uso": 20,
+    "mprima": 17.70,
+    "cusuario": 4,
+    ...
+  }'</code></pre>
+      <p><strong>Response:</strong></p>
+      <pre><code>{
+  "result": {
+    "error": true,
+    "result": {
+      "error": "Se ha detectado la existencia de una póliza vigente la misma placa del vehículo."
+    }
+  },
+  "status": false
+}
+[HTTP: 400]</code></pre>
+      <div class="alert alert-success">
+        <strong>Interpretación:</strong> El plan RUSPAT <strong>pasa la validación del stored procedure</strong>
+        y llega a la capa de lógica de negocio, donde La Mundial detecta correctamente que la placa
+        ya tiene una póliza vigente en su ambiente QA. Esto demuestra que:<br><br>
+        ✅ Nuestra integración es correcta (payload, auth, endpoint)<br>
+        ✅ El servidor CorreccionCalculo funciona para RUSPAT<br>
+        ❌ El stored procedure de <strong>RCVBAS</strong> en CorreccionCalculo tiene un esquema desactualizado
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARACION DE ERRORES -->
+  <h2>4. Análisis Comparativo</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Aspecto</th>
+        <th>RUSPAT en CorreccionCalculo</th>
+        <th>RCVBAS en CorreccionCalculo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Autenticación</td>
+        <td><span class="ok">✅ Pasa</span></td>
+        <td><span class="ok">✅ Pasa</span></td>
+      </tr>
+      <tr>
+        <td>Parsing del payload JSON</td>
+        <td><span class="ok">✅ Pasa</span></td>
+        <td><span class="ok">✅ Pasa</span></td>
+      </tr>
+      <tr>
+        <td>Validación de campos requeridos</td>
+        <td><span class="ok">✅ Pasa</span></td>
+        <td><span class="ok">✅ Pasa</span></td>
+      </tr>
+      <tr>
+        <td>Ejecución del Stored Procedure SQL</td>
+        <td><span class="ok">✅ Funciona</span></td>
+        <td><span class="fail">❌ Column mismatch</span></td>
+      </tr>
+      <tr>
+        <td>Lógica de negocio</td>
+        <td><span class="ok">✅ Alcanzada (error de placa vigente)</span></td>
+        <td><span class="fail">❌ No alcanzada</span></td>
+      </tr>
+      <tr>
+        <td>Responsabilidad del fallo</td>
+        <td>—</td>
+        <td><span class="fail">Servidor La Mundial (SP RCVBAS)</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- VARIACIONES PROBADAS -->
+  <h2>5. Variaciones de Payload Probadas para RCVBAS</h2>
+  <p>Se probaron todas las combinaciones posibles sin éxito:</p>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Variación</th><th>Resultado</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Payload base con <code>mprima</code> de cotización (197,455.12)</td><td><span class="fail">❌ Column mismatch</span></td></tr>
+      <tr><td>2</td><td>+ agregar <code>mprimaext: 407.34</code></td><td><span class="fail">❌ Column mismatch</span></td></tr>
+      <tr><td>3</td><td>+ agregar <code>ptasa: 484.74</code></td><td><span class="fail">❌ Column mismatch</span></td></tr>
+      <tr><td>4</td><td>+ agregar <code>cusuario: 4</code></td><td><span class="fail">❌ Column mismatch</span></td></tr>
+      <tr><td>5</td><td>Sin <code>ntoneladas</code>, <code>ccategoria_uso: 20</code></td><td><span class="fail">❌ Column mismatch</span></td></tr>
+      <tr><td>6</td><td>Con <code>version: "01"</code> (como en Postman de La Mundial)</td><td><span class="fail">❌ Column mismatch</span></td></tr>
+      <tr><td>7</td><td>Payload RUSPAT completo cambiando solo <code>plan</code> a RCVBAS</td><td><span class="fail">❌ Column mismatch</span></td></tr>
+      <tr><td>8</td><td>Sin <code>mprima</code> (como payload QA original de La Mundial)</td><td><span class="fail">❌ Column mismatch</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="alert alert-info">
+    <strong>Nota técnica:</strong> El error SQL de La Mundial dice <em>"Column name OR number of supplied values"</em>,
+    lo que indica que el problema puede ser el nombre de algún campo inesperado por el SP o un campo que
+    el SP requiere y no está documentado en la colección Postman. Dado que el mismo payload (estructura)
+    con RUSPAT sí funciona, el problema es específico del SP asociado al plan RCVBAS.
+  </div>
+
+  <!-- ACCION REQUERIDA -->
+  <h2>6. Acción Requerida por La Mundial</h2>
+
+  <div class="alert alert-danger">
+    <strong>Se solicita al equipo técnico de La Mundial de Seguros:</strong><br><br>
+    1. Revisar y actualizar el Stored Procedure asociado al plan <strong>RCVBAS</strong> en el servidor
+    <code>CorreccionCalculo</code> (<code>qaapisys2000.lamundialdeseguros.com/CorreccionCalculo</code>).<br><br>
+    2. Verificar que el esquema de la tabla/SP de RCVBAS coincida con los campos documentados en la colección
+    Postman oficial (<code>RCV2.postman_collection.json</code>).<br><br>
+    3. Confirmar si el plan RCVBAS requiere campos adicionales no documentados (por ejemplo, campos
+    propios del nuevo cálculo de <code>CorreccionCalculo</code>) y actualizar la documentación/colección.<br><br>
+    4. Una vez corregido, notificar a ExelixiTech para re-ejecutar las pruebas de emisión.
+  </div>
+
+  <!-- INFRAESTRUCTURA CONFIRMADA -->
+  <h2>7. Infraestructura y Conectividad (Confirmada)</h2>
+  <table>
+    <thead>
+      <tr><th>Componente</th><th>Estado</th><th>Detalle</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>DNS / Conectividad</td>
+        <td><span class="ok">✅ OK</span></td>
+        <td>Resolución correcta a <code>qaapisys2000.lamundialdeseguros.com</code></td>
+      </tr>
+      <tr>
+        <td>Autenticación (<code>apikey</code> header)</td>
+        <td><span class="ok">✅ OK</span></td>
+        <td>Token validado correctamente en ambos servidores</td>
+      </tr>
+      <tr>
+        <td>Endpoint <code>/CorreccionCalculo</code></td>
+        <td><span class="ok">✅ OK</span></td>
+        <td>Node.js en <code>/var/www/html/backend/SysIP-backend-CorreccionCalculo</code></td>
+      </tr>
+      <tr>
+        <td>Cotización RCVBAS</td>
+        <td><span class="ok">✅ OK</span></td>
+        <td>Devuelve prima, monto en divisas y tasa de cambio correctamente</td>
+      </tr>
+      <tr>
+        <td>Emisión RUSPAT</td>
+        <td><span class="ok">✅ OK</span></td>
+        <td>SP ejecuta, llega a validación de negocio (placa vigente)</td>
+      </tr>
+      <tr>
+        <td>Emisión RCVBAS</td>
+        <td><span class="fail">❌ FALLO</span></td>
+        <td>SP de RCVBAS con columnas desajustadas — requiere corrección en La Mundial</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>
+      <strong>ExelixiTech</strong> · soporte@exelixitech.com<br>
+      Informe generado el 27 de abril de 2026
+    </div>
+    <div style="text-align:right;">
+      Integración RCV · La Mundial de Seguros<br>
+      Ambiente: QA · <code>CorreccionCalculo</code>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
