@@ -1,0 +1,147 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Render Blueprint — despliegue completo de Exelixi API                  ║
+# ╠══════════════════════════════════════════════════════════════════════════╣
+# ║  Define toda la infraestructura (backend, frontend, BD, Redis) en un    ║
+# ║  solo archivo. Para desplegar:                                          ║
+# ║                                                                         ║
+# ║    1. Commitea y haz push de este archivo a GitHub.                    ║
+# ║    2. Render Dashboard → Blueprints → "New Blueprint Instance".        ║
+# ║    3. Selecciona el repositorio y confirma.                            ║
+# ║    4. Render crea automáticamente: PostgreSQL + Redis + Backend +      ║
+# ║       Frontend, conecta las variables y despliega todo.                ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+databases:
+  - name: exelixi-postgres
+    plan: free            # PostgreSQL free: 1 GB, expira tras 90 días (renovable)
+    databaseName: exelixi_db
+    user: exelixi_user
+    region: oregon        # Misma región que los servicios para evitar latencia
+
+services:
+  # ── Redis (BullMQ + cache de sesiones + circuit breaker) ───────────────
+  - type: redis
+    name: exelixi-redis
+    plan: free
+    region: oregon
+    ipAllowList: []       # Solo accesible desde la red privada de Render
+    maxmemoryPolicy: allkeys-lru
+
+  # ── Backend NestJS ─────────────────────────────────────────────────────
+  - type: web
+    name: exelixi-api-backend
+    runtime: node
+    plan: free            # Duerme tras 15 min sin tráfico (cold start ~30s al despertar)
+    region: oregon
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/main
+    healthCheckPath: /api/health
+    autoDeploy: true
+    branch: master
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_PREFIX
+        value: api
+      - key: SESSION_SECRET
+        generateValue: true       # Render genera un secreto seguro
+      - key: ADMIN_SECRET
+        generateValue: true
+      - key: SESSION_TTL_HOURS
+        value: 8
+
+      # CORS — completa con la URL final del frontend tras el primer deploy
+      # Ej: https://exelixi-api-frontend.onrender.com,http://localhost:5173
+      - key: CORS_ORIGINS
+        sync: false       # Render lo deja vacío; tú lo llenas en el dashboard
+
+      # PostgreSQL — Render conecta automáticamente
+      - key: DB_HOST
+        fromDatabase: { name: exelixi-postgres, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: exelixi-postgres, property: port }
+      - key: DB_USERNAME
+        fromDatabase: { name: exelixi-postgres, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: exelixi-postgres, property: password }
+      - key: DB_NAME
+        fromDatabase: { name: exelixi-postgres, property: database }
+      - key: DB_POOL_SIZE
+        value: 20
+      - key: DB_POOL_IDLE_TIMEOUT
+        value: 30000
+      - key: DB_POOL_CONNECTION_TIMEOUT
+        value: 10000
+
+      # Redis — Render conecta automáticamente
+      - key: REDIS_HOST
+        fromService: { type: redis, name: exelixi-redis, property: host }
+      - key: REDIS_PORT
+        fromService: { type: redis, name: exelixi-redis, property: port }
+      - key: REDIS_DB
+        value: 0
+
+      # Webhook externo (opcional, configurar después si aplica)
+      - key: EXTERNAL_WEBHOOK_URL
+        value: ""
+      - key: EXTERNAL_WEBHOOK_SECRET
+        value: ""
+      - key: EXTERNAL_WEBHOOK_TIMEOUT
+        value: 10000
+      - key: EXTERNAL_WEBHOOK_RETRIES
+        value: 3
+
+      # Rate limiting
+      - key: THROTTLE_TTL
+        value: 60000
+      - key: THROTTLE_LIMIT
+        value: 100000
+
+      # Logs
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_DIR
+        value: logs
+
+      # Cola
+      - key: QUEUE_CONCURRENCY
+        value: 10
+      - key: QUEUE_MAX_JOBS
+        value: 10000
+
+  # ── Frontend React + Vite ──────────────────────────────────────────────
+  - type: web
+    name: exelixi-api-frontend
+    runtime: static
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeploy: true
+    branch: master
+
+    envVars:
+      # Completar tras el primer deploy del backend.
+      # Ej: https://exelixi-api-backend.onrender.com/api
+      - key: VITE_API_URL
+        sync: false
+
+    # Rutas SPA — todas las URLs sirven index.html
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
