@@ -251,4 +251,25 @@ export const dashboardApi = {
     adminClient.get<CarteraCliente[]>('/dashboard/admin/cartera', {
       headers: { 'X-Admin-Key': adminKey },
     }),
+
+  // ── Drill-down: dashboard de un tenant específico (admin) ─────────────────
+  kpisDeTenant: (adminKey: string, tenantId: string) =>
+    adminClient.get<DashboardKpis>(`/dashboard/admin/tenants/${tenantId}/kpis`, {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
+  rankingDeTenant: (
+    adminKey: string,
+    tenantId: string,
+    metrica: 'viajes' | 'prima' | 'comision' = 'prima',
+    limit = 10,
+  ) =>
+    adminClient.get<RankingConductor[]>(
+      `/dashboard/admin/tenants/${tenantId}/conductores/ranking?metrica=${metrica}&limit=${limit}`,
+      { headers: { 'X-Admin-Key': adminKey } },
+    ),
+  enCursoDeTenant: (adminKey: string, tenantId: string) =>
+    adminClient.get<RankingConductor[]>(
+      `/dashboard/admin/tenants/${tenantId}/conductores/en-curso`,
+      { headers: { 'X-Admin-Key': adminKey } },
+    ),
 };

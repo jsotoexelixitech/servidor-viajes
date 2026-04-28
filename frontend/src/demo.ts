@@ -295,6 +295,82 @@ function calcularRanking(list: DemoViaje[], metrica: 'viajes' | 'prima' | 'comis
   return arr.sort((a, b) => (b[key] as number) - (a[key] as number));
 }
 
+// ─── Generadores sintéticos por tenant (drill-down admin) ────────────────────
+/**
+ * Devuelve KPIs deterministas para un tenantId. Si es el tenant principal
+ * usa los datos reales del demo; para los demás genera valores consistentes
+ * a partir de una semilla.
+ */
+function kpisSimuladosTenant(tenantId: string) {
+  if (tenantId === DEMO_TENANT_ID) return calcularKpis(viajes);
+  const semilla = parseInt(tenantId.replace(/\D/g, '').slice(-2) || '5', 10);
+  const totalViajes      = Math.floor(40 + semilla * 7.5);
+  const viajesActivos    = Math.max(1, Math.floor(totalViajes * 0.06));
+  const viajesFinalizados= totalViajes - viajesActivos;
+  const polizasActivas   = Math.floor(totalViajes * 0.92);
+  const recibos          = polizasActivas;
+  const ticketBase       = 520 + semilla * 12;
+  const primaTotal       = Math.round(totalViajes * ticketBase);
+  const comisionTotal    = Math.round(primaTotal * 0.115);
+  const primaTotalExt    = Math.round((primaTotal / 36.5) * 100) / 100;
+  const ticketPromedio   = primaTotal / Math.max(totalViajes, 1);
+  return {
+    totalViajes, viajesActivos, viajesFinalizados,
+    polizasActivas, recibos,
+    primaTotal, primaTotalExt, comisionTotal, ticketPromedio,
+  };
+}
+
+const NOMBRES_FAKE = [
+  ['Carlos', 'Rivera'], ['María', 'González'], ['Andrés', 'López'],
+  ['Sofía', 'Martínez'], ['Diego', 'Hernández'], ['Lucía', 'Pérez'],
+  ['Javier', 'Núñez'], ['Daniela', 'Castro'], ['Roberto', 'Mendoza'],
+  ['Valentina', 'Ruiz'],
+];
+
+function rankingSimuladoTenant(tenantId: string, metrica: 'viajes' | 'prima' | 'comision') {
+  if (tenantId === DEMO_TENANT_ID) return calcularRanking(viajes, metrica);
+  const semilla = parseInt(tenantId.replace(/\D/g, '').slice(-2) || '5', 10);
+  const k = kpisSimuladosTenant(tenantId);
+  const cantidad = Math.min(6, NOMBRES_FAKE.length);
+  const rows = NOMBRES_FAKE.slice(0, cantidad).map((n, i) => {
+    const peso = (cantidad - i) / ((cantidad * (cantidad + 1)) / 2);
+    const totalViajes = Math.floor(k.totalViajes * peso);
+    const primaGenerada = Math.round(k.primaTotal * peso);
+    const comisionGenerada = Math.round(k.comisionTotal * peso);
+    const viajesActivos = i === 0 && k.viajesActivos > 0 ? k.viajesActivos : 0;
+    return {
+      conductorId: `cd-${tenantId}-${i}`,
+      nombre: `${n[0]} ${n[1]}`,
+      cedula: `V${10000000 + semilla * 1000 + i * 137}`,
+      totalViajes, viajesActivos, primaGenerada, comisionGenerada,
+    };
+  });
+  const key = metrica === 'viajes' ? 'totalViajes'
+    : metrica === 'comision' ? 'comisionGenerada'
+    : 'primaGenerada';
+  return rows.sort((a, b) => (b[key] as number) - (a[key] as number));
+}
+
+function enCursoSimuladoTenant(tenantId: string) {
+  if (tenantId === DEMO_TENANT_ID) {
+    const activos = viajes.filter(v => v.estado === 'EN_CURSO' || v.estado === 'INICIADO');
+    return calcularRanking(activos, 'viajes');
+  }
+  const k = kpisSimuladosTenant(tenantId);
+  if (k.viajesActivos === 0) return [];
+  const semilla = parseInt(tenantId.replace(/\D/g, '').slice(-2) || '5', 10);
+  return NOMBRES_FAKE.slice(0, Math.min(k.viajesActivos, 4)).map((n, i) => ({
+    conductorId: `cd-${tenantId}-${i}`,
+    nombre: `${n[0]} ${n[1]}`,
+    cedula: `V${10000000 + semilla * 1000 + i * 137}`,
+    totalViajes: 1,
+    viajesActivos: 1,
+    primaGenerada: 0,
+    comisionGenerada: 0,
+  }));
+}
+
 // ─── Router de mocks ──────────────────────────────────────────────────────────
 type Method = 'get' | 'post' | 'put' | 'delete' | 'patch';
 
@@ -538,28 +614,30 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
 
   if (method === 'get' && path === 'dashboard/admin/cartera') {
     return tenants.map(t => {
-      // Para cada tenant, generamos KPIs proporcionales
-      // El tenant principal usa los datos reales; los demás se simulan
-      const esTenantPrincipal = t.id === DEMO_TENANT_ID;
-      if (esTenantPrincipal) {
-        const k = calcularKpis(viajes);
-        return {
-          id: t.id, nombre: t.nombre, activo: t.activo, creadoEn: t.createdAt,
-          totalViajes: k.totalViajes, viajesActivos: k.viajesActivos,
-          primaTotal: k.primaTotal, comisionTotal: k.comisionTotal,
-        };
-      }
-      // Datos sintéticos coherentes para los demás tenants
-      const semilla = parseInt(t.id.replace(/\D/g, '').slice(-2) || '5', 10);
-      const totalViajes = Math.floor(40 + semilla * 7.5);
-      const viajesActivos = Math.floor(totalViajes * 0.06);
-      const primaTotal = Math.round(totalViajes * (520 + semilla * 12));
-      const comisionTotal = Math.round(primaTotal * 0.115);
+      const k = kpisSimuladosTenant(t.id);
       return {
         id: t.id, nombre: t.nombre, activo: t.activo, creadoEn: t.createdAt,
-        totalViajes, viajesActivos, primaTotal, comisionTotal,
+        totalViajes: k.totalViajes, viajesActivos: k.viajesActivos,
+        primaTotal: k.primaTotal, comisionTotal: k.comisionTotal,
       };
     });
+  }
+
+  // ── Drill-down: KPIs/ranking/en-curso por tenantId (admin) ────────────────
+  const drillKpis = path.match(/^dashboard\/admin\/tenants\/([^/]+)\/kpis$/);
+  if (method === 'get' && drillKpis) {
+    return kpisSimuladosTenant(drillKpis[1]);
+  }
+  const drillRanking = path.match(/^dashboard\/admin\/tenants\/([^/]+)\/conductores\/ranking/);
+  if (method === 'get' && drillRanking) {
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    const metrica = (params.get('metrica') as 'viajes' | 'prima' | 'comision') ?? 'prima';
+    const limit = parseInt(params.get('limit') ?? '10', 10);
+    return rankingSimuladoTenant(drillRanking[1], metrica).slice(0, limit);
+  }
+  const drillEnCurso = path.match(/^dashboard\/admin\/tenants\/([^/]+)\/conductores\/en-curso$/);
+  if (method === 'get' && drillEnCurso) {
+    return enCursoSimuladoTenant(drillEnCurso[1]);
   }
 
   // ── Fallback ─────────────────────────────────────────────────────────────
