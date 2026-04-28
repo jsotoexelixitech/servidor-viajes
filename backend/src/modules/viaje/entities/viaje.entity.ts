@@ -3,6 +3,7 @@ import {
   UpdateDateColumn, Index, ManyToOne, JoinColumn,
 } from 'typeorm';
 import { Tenant } from '../../tenant/entities/tenant.entity';
+import { Vendedor } from '../../vendedor/entities/vendedor.entity';
 
 export enum EstadoViaje {
   INICIADO = 'INICIADO',
@@ -16,6 +17,7 @@ export type EstadoPoliza = 'EMITIENDO' | 'ACTIVA' | 'FINALIZADA' | 'ERROR' | 'CR
 @Entity('viajes')
 @Index(['tenantId', 'estado'])
 @Index(['tenantId', 'creadoEn'])
+@Index(['tenantId', 'vendedorId'])
 export class Viaje {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -96,6 +98,35 @@ export class Viaje {
 
   @Column({ name: 'webhook_ultimo_error', type: 'text', nullable: true })
   webhookUltimoError: string;
+
+  // ─── Vendedor / asesor responsable ────────────────────────────────────────
+  @Column({ name: 'vendedor_id', type: 'uuid', nullable: true })
+  vendedorId: string | null;
+
+  @ManyToOne(() => Vendedor, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'vendedor_id' })
+  vendedor: Vendedor;
+
+  /** Snapshot del nombre del vendedor al momento de la operación */
+  @Column({ name: 'vendedor_nombre', type: 'varchar', length: 200, nullable: true })
+  vendedorNombre: string;
+
+  // ─── Datos comerciales ────────────────────────────────────────────────────
+  /** Tipo o plan de cobertura: RCVBAS, RUSPAT, etc. */
+  @Column({ name: 'plan_poliza', type: 'varchar', length: 30, nullable: true })
+  planPoliza: string;
+
+  /** Prima total cobrada (Bs) — base para el cálculo de la comisión */
+  @Column({ type: 'decimal', precision: 14, scale: 2, default: 0 })
+  prima: number;
+
+  /** Prima en divisa (USD), si aplica */
+  @Column({ name: 'prima_ext', type: 'decimal', precision: 14, scale: 2, default: 0 })
+  primaExt: number;
+
+  /** Comisión generada por la suscripción (Bs) */
+  @Column({ type: 'decimal', precision: 14, scale: 2, default: 0 })
+  comision: number;
 
   // ─── Body original y metadata ─────────────────────────────────────────────
   /** Body transformado guardado para reintentos y auditoría */

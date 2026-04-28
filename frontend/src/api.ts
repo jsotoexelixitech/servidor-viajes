@@ -63,6 +63,63 @@ export interface Viaje {
   estadoPoliza?: string; polizaError?: string;
   webhookEnviado: boolean; webhookIntentos: number; creadoEn: string;
   metadata?: Record<string, unknown>;
+  vendedorId?: string | null;
+  vendedorNombre?: string;
+  planPoliza?: string;
+  prima?: number;
+  primaExt?: number;
+  comision?: number;
+}
+
+export interface Vendedor {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  apellido?: string;
+  cedula: string;
+  telefono?: string;
+  email?: string;
+  porcentajeComision: number;
+  estado: 'ACTIVO' | 'INACTIVO' | 'SUSPENDIDO';
+  creadoEn: string;
+}
+
+export interface DashboardKpis {
+  totalViajes: number;
+  viajesActivos: number;
+  viajesFinalizados: number;
+  polizasActivas: number;
+  recibos: number;
+  primaTotal: number;
+  primaTotalExt: number;
+  comisionTotal: number;
+  ticketPromedio: number;
+}
+
+export interface KpisGlobales extends DashboardKpis {
+  totalTenants: number;
+  totalVendedores: number;
+}
+
+export interface RankingVendedor {
+  vendedorId: string | null;
+  nombre: string;
+  cedula: string;
+  totalViajes: number;
+  viajesActivos: number;
+  primaGenerada: number;
+  comisionGenerada: number;
+}
+
+export interface CarteraCliente {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  creadoEn: string;
+  totalViajes: number;
+  viajesActivos: number;
+  primaTotal: number;
+  comisionTotal: number;
 }
 
 /**
@@ -170,4 +227,29 @@ export const tenantApi = {
    * Devuelve SOLO las pólizas de su propio tenant — nunca datos de otros.
    */
   misPolizasCriticas: () => api.get('/viaje/mis-polizas-criticas'),
+};
+
+export const vendedorApi = {
+  listar:   (soloActivos = false) =>
+    api.get<Vendedor[]>(`/vendedores?soloActivos=${soloActivos}`),
+  crear:    (data: Omit<Vendedor, 'id' | 'tenantId' | 'creadoEn'>) =>
+    api.post<Vendedor>('/vendedores', data),
+  actualizar: (id: string, data: Partial<Vendedor>) =>
+    api.put<Vendedor>(`/vendedores/${id}`, data),
+  eliminar: (id: string) => api.delete(`/vendedores/${id}`),
+};
+
+export const dashboardApi = {
+  kpis: () => api.get<DashboardKpis>('/dashboard/kpis'),
+  ranking: (metrica: 'viajes' | 'prima' | 'comision' = 'prima', limit = 10) =>
+    api.get<RankingVendedor[]>(`/dashboard/vendedores/ranking?metrica=${metrica}&limit=${limit}`),
+  enCurso: () => api.get<RankingVendedor[]>('/dashboard/vendedores/en-curso'),
+  global: (adminKey: string) =>
+    adminClient.get<KpisGlobales>('/dashboard/admin/global', {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
+  cartera: (adminKey: string) =>
+    adminClient.get<CarteraCliente[]>('/dashboard/admin/cartera', {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
 };

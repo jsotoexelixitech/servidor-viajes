@@ -2,12 +2,14 @@ import React, { useState, useCallback, useEffect, useRef, FormEvent } from 'reac
 import toast, { Toaster } from 'react-hot-toast';
 import {
   authApi, setSessionToken, clearSession, viajeApi, tenantApi, adminApi,
-  Viaje, CAMPOS_SEGURO, SeguroConfig, FRECUENCIAS, CampoSeguro,
+  dashboardApi, vendedorApi,
+  Viaje, Vendedor, DashboardKpis, KpisGlobales, RankingVendedor, CarteraCliente,
+  CAMPOS_SEGURO, SeguroConfig, FRECUENCIAS, CampoSeguro,
 } from './api';
 import { setDemoMode, isDemoMode, DEMO_INFO, buildDemoViajeBody } from './demo';
 import { WelcomeSplash } from './WelcomeSplash';
 
-type Tab = 'dashboard' | 'setup' | 'mapeo' | 'viaje' | 'finalizar' | 'listar' | 'monitor';
+type Tab = 'dashboard' | 'setup' | 'mapeo' | 'viaje' | 'finalizar' | 'listar' | 'monitor' | 'vendedores' | 'cartera';
 type ReqStatus = 'idle' | 'loading' | 'success' | 'error';
 
 interface Notif {
@@ -40,6 +42,10 @@ const Ic = {
   eyeOff:   (p?: string) => <svg className={p ?? 'w-3.5 h-3.5'} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 2l12 12M6.5 6.6A2 2 0 0 0 9.4 9.5M4.1 4.2A6.5 6.5 0 0 0 1.5 8s2.5 5 6.5 5a6.4 6.4 0 0 0 3.9-1.3M6 2.3A6.4 6.4 0 0 1 8 2c4 0 6.5 5 6.5 5a11.6 11.6 0 0 1-1.5 2.3"/></svg>,
   link:     (p?: string) => <svg className={p ?? 'w-3 h-3'} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 2H3a2 2 0 0 0 0 4h2M7 10h2a2 2 0 0 0 0-4H7M4 6h4"/></svg>,
   chevron:  (p?: string) => <svg className={p ?? 'w-3.5 h-3.5'} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 3 4 4-4 4"/></svg>,
+  users:    (p?: string) => <svg className={p ?? 'w-4 h-4'} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="5" r="2.5"/><path d="M1.5 13.5a4.5 4.5 0 0 1 9 0"/><circle cx="11.5" cy="6" r="2"/><path d="M11 10c1.7 0 3.2 1 3.5 3"/></svg>,
+  cash:     (p?: string) => <svg className={p ?? 'w-4 h-4'} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5"/><circle cx="8" cy="8" r="1.8"/><path d="M3.5 6v4M12.5 6v4"/></svg>,
+  trend:    (p?: string) => <svg className={p ?? 'w-4 h-4'} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12 6 8l3 3 5-6"/><path d="M10 5h4v4"/></svg>,
+  trophy:   (p?: string) => <svg className={p ?? 'w-4 h-4'} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2.5h8v3a4 4 0 0 1-8 0z"/><path d="M4 4H2.5v1.5A2.5 2.5 0 0 0 5 8M12 4h1.5v1.5A2.5 2.5 0 0 1 11 8"/><path d="M6.5 9.5h3v3h-3z"/><path d="M5 13.5h6"/></svg>,
 };
 
 const POLIZA_BADGE: Record<string, string> = {
@@ -690,7 +696,7 @@ export default function App() {
   const mappedCount  = Object.values(fieldMappings).filter(v => v?.trim()).length;
   const defaultCount = Object.values(defaultValues).filter(v => v?.trim()).length;
 
-  const NAV_REQUIRES_KEY = new Set<Tab>(['mapeo', 'viaje', 'finalizar', 'listar', 'monitor']);
+  const NAV_REQUIRES_KEY = new Set<Tab>(['mapeo', 'viaje', 'finalizar', 'listar', 'monitor', 'vendedores']);
   const navTo = (id: Tab) => {
     if (NAV_REQUIRES_KEY.has(id) && !apiKeySet) return;
     setTab(id); setReqStatus('idle'); setResponse(null);
@@ -707,14 +713,16 @@ export default function App() {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  const NAV: { id: Tab; label: string; icon: () => React.ReactNode; dot?: boolean; requiresKey?: boolean }[] = [
-    { id: 'dashboard', label: 'Dashboard',     icon: () => Ic.grid() },
-    { id: 'setup',     label: 'Nuevo Cliente', icon: () => Ic.plus() },
-    { id: 'mapeo',     label: 'Configuración', icon: () => Ic.gear(),  requiresKey: true },
-    { id: 'viaje',     label: 'Iniciar Viaje', icon: () => Ic.play(),  requiresKey: true },
-    { id: 'finalizar', label: 'Finalizar',     icon: () => Ic.stop(),  requiresKey: true },
-    { id: 'listar',    label: 'Viajes',        icon: () => Ic.rows(),  requiresKey: true },
-    { id: 'monitor',   label: 'Monitor',       icon: () => Ic.pulse(), dot: true, requiresKey: true },
+  const NAV: { id: Tab; label: string; icon: () => React.ReactNode; dot?: boolean; requiresKey?: boolean; section?: string }[] = [
+    { id: 'dashboard',  label: 'Dashboard',     icon: () => Ic.grid() },
+    { id: 'cartera',    label: 'Cartera',       icon: () => Ic.shield() },
+    { id: 'setup',      label: 'Nuevo Cliente', icon: () => Ic.plus() },
+    { id: 'mapeo',      label: 'Configuración', icon: () => Ic.gear(),  requiresKey: true },
+    { id: 'vendedores', label: 'Vendedores',    icon: () => Ic.users(), requiresKey: true },
+    { id: 'viaje',      label: 'Iniciar Viaje', icon: () => Ic.play(),  requiresKey: true },
+    { id: 'finalizar',  label: 'Finalizar',     icon: () => Ic.stop(),  requiresKey: true },
+    { id: 'listar',     label: 'Viajes',        icon: () => Ic.rows(),  requiresKey: true },
+    { id: 'monitor',    label: 'Monitor',       icon: () => Ic.pulse(), dot: true, requiresKey: true },
   ];
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -946,78 +954,26 @@ export default function App() {
 
           {/* ══ DASHBOARD ══ */}
           {tab === 'dashboard' && (
-            <div className="animate-in-slow">
-              <PageHeader title="Panel de Control" subtitle="Plataforma de emisión de pólizas de seguro vehicular" />
+            <DashboardPanel
+              apiKeySet={apiKeySet}
+              tenantNombre={tenantNombreConectado}
+              navTo={navTo}
+            />
+          )}
 
-              {/* KPIs */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 stagger">
-                {[
-                  { label: 'Capacidad diaria',    value: '120 K+', sub: 'viajes por día',         gradient: 'gradient-brand',   shadow: 'shadow-[0_6px_20px_-4px_rgb(77_85_232/.35)]' },
-                  { label: 'Disponibilidad',       value: '99.9 %', sub: 'uptime garantizado',     gradient: 'gradient-success', shadow: 'shadow-[0_6px_20px_-4px_rgb(5_150_105/.32)]' },
-                  { label: 'Cobertura reintentos', value: '3 h',    sub: 'protección ante fallos', gradient: 'gradient-warm',    shadow: 'shadow-[0_6px_20px_-4px_rgb(217_119_6/.30)]' },
-                ].map(k => (
-                  <div key={k.label} className={`noise relative overflow-hidden ${k.gradient} ${k.shadow} rounded-[var(--radius)] p-5 text-white`}>
-                    <p className="text-[10.5px] font-extrabold uppercase tracking-[0.1em] opacity-60">{k.label}</p>
-                    <p className="text-[2.5rem] font-extrabold leading-tight mt-1 tabular-nums">{k.value}</p>
-                    <p className="text-xs opacity-50 mt-0.5 font-medium">{k.sub}</p>
-                  </div>
-                ))}
-              </div>
+          {/* ══ CARTERA (admin) ══ */}
+          {tab === 'cartera' && (
+            <CarteraPanel adminKey={adminKeyInput} setAdminKey={setAdminKeyInput} />
+          )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-                {/* Quick start */}
-                <div className="lg:col-span-2 card p-6">
-                  <p className="section-title mb-5">🚀 Inicio rápido</p>
-                  <ol className="space-y-4">
-                    {[
-                      { t: 'Crea tu empresa',     d: '"Nuevo Cliente" → obtén tu API Key',        go: 'setup'   as Tab },
-                      { t: 'Conecta la API Key',  d: 'Pégala en el campo del header',              go: null },
-                      { t: 'Configura el mapeo',  d: 'Define campos y valores por defecto',        go: 'mapeo'   as Tab },
-                      { t: 'Inicia viajes',        d: 'Envía tu JSON → póliza emitida al instante', go: 'viaje'   as Tab },
-                      { t: 'Monitorea',            d: 'Supervisa pólizas en tiempo real',           go: 'monitor' as Tab },
-                    ].map((s, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <span className="step-num mt-0.5">{i + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-800">{s.t}</p>
-                          <p className="text-xs text-slate-600 mt-0.5">{s.d}</p>
-                        </div>
-                        {s.go && (() => {
-                          const needsKey = NAV_REQUIRES_KEY.has(s.go);
-                          const blocked  = needsKey && !apiKeySet;
-                          return (
-                            <button onClick={() => navTo(s.go!)} disabled={blocked}
-                              title={blocked ? 'Requiere API Key' : undefined}
-                              className={`shrink-0 flex items-center gap-0.5 text-xs font-bold transition-colors mt-0.5 ${
-                                blocked ? 'text-slate-500 cursor-not-allowed' : 'text-brand-600 hover:text-brand-800'
-                              }`}>
-                              Ir {Ic.arrow()}
-                            </button>
-                          );
-                        })()}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-
-                {/* Features */}
-                <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-3 stagger">
-                  {[
-                    { icon: '🔐', t: 'Multi-tenant',           d: 'Datos aislados por empresa. Cada cliente opera en su propio espacio seguro y privado.' },
-                    { icon: '⚡', t: 'Alta disponibilidad',     d: 'Cluster Node.js + PostgreSQL pooling + Redis distribuido para resistir picos de tráfico.' },
-                    { icon: '🛡️', t: '5 capas de protección',  d: 'Idempotencia, circuit breaker, reintentos exponenciales, guardian cron y verificación post-emisión.' },
-                    { icon: '🔄', t: 'Reintentos automáticos',  d: 'Si la emisión falla, el sistema reintenta con backoff exponencial hasta 3 horas continuas.' },
-                  ].map(f => (
-                    <div key={f.t} className="card-hover p-4 flex items-start gap-3">
-                      <span className="text-xl mt-0.5 shrink-0">{f.icon}</span>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">{f.t}</p>
-                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">{f.d}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          {/* ══ VENDEDORES ══ */}
+          {tab === 'vendedores' && apiKeySet && (
+            <VendedoresPanel pushNotif={pushNotif} />
+          )}
+          {tab === 'vendedores' && !apiKeySet && (
+            <div className="card p-10 text-center">
+              <p className="text-sm font-bold text-slate-700 mb-2">Conecta tu API Key</p>
+              <p className="text-xs text-slate-600">Esta sección requiere autenticación de cliente.</p>
             </div>
           )}
 
@@ -1546,6 +1502,669 @@ export default function App() {
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   DASHBOARD PANEL — KPIs por cliente, ranking de vendedores, en curso
+// ═════════════════════════════════════════════════════════════════════════════
+
+const fmtBs = (n: number) =>
+  new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const fmtInt = (n: number) => new Intl.NumberFormat('es-VE').format(n);
+
+function DashboardPanel({
+  apiKeySet, tenantNombre, navTo,
+}: {
+  apiKeySet: boolean;
+  tenantNombre: string;
+  navTo: (t: Tab) => void;
+}) {
+  const [kpis, setKpis] = useState<DashboardKpis | null>(null);
+  const [topPrima, setTopPrima] = useState<RankingVendedor[]>([]);
+  const [topViajes, setTopViajes] = useState<RankingVendedor[]>([]);
+  const [topComision, setTopComision] = useState<RankingVendedor[]>([]);
+  const [enCurso, setEnCurso] = useState<RankingVendedor[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    if (!apiKeySet) return;
+    setLoading(true); setErr('');
+    try {
+      const [k, rp, rv, rc, ec] = await Promise.all([
+        dashboardApi.kpis(),
+        dashboardApi.ranking('prima', 5),
+        dashboardApi.ranking('viajes', 5),
+        dashboardApi.ranking('comision', 5),
+        dashboardApi.enCurso(),
+      ]);
+      setKpis(k.data);
+      setTopPrima(rp.data);
+      setTopViajes(rv.data);
+      setTopComision(rc.data);
+      setEnCurso(ec.data);
+    } catch (e: any) {
+      setErr(e?.response?.data?.message ?? 'No se pudieron cargar los KPIs');
+    } finally {
+      setLoading(false);
+    }
+  }, [apiKeySet]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className="animate-in-slow">
+      <PageHeader
+        title="Panel de Control"
+        subtitle={apiKeySet
+          ? `Gestión de cartera · ${tenantNombre || 'Cliente conectado'}`
+          : 'Conecta tu API Key para ver los datos de tu cartera'}
+        action={apiKeySet && (
+          <button onClick={load}
+            className="btn-secondary h-9 text-xs flex items-center gap-1.5 px-3"
+            disabled={loading}>
+            {loading ? <Spinner size="sm" /> : Ic.refresh()} Actualizar
+          </button>
+        )}
+      />
+
+      {!apiKeySet && (
+        <div className="card p-10 text-center mb-6">
+          <p className="text-sm font-bold text-slate-700 mb-1">No hay sesión activa</p>
+          <p className="text-xs text-slate-600 mb-4">
+            Conecta tu API Key en el header para ver los KPIs de tu cartera de viajes,
+            comisiones y vendedores.
+          </p>
+          <button onClick={() => navTo('setup')} className="btn-primary text-xs px-4 mx-auto inline-flex">
+            {Ic.plus()} Crear nuevo cliente
+          </button>
+        </div>
+      )}
+
+      {err && (
+        <div className="alert-error mb-5">
+          <p className="text-xs font-bold text-red-700">{err}</p>
+        </div>
+      )}
+
+      {apiKeySet && (
+        <>
+          {/* ─── KPIs principales ──────────────────────────────────────── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5 stagger">
+            <KpiCard
+              icon={Ic.rows('w-4 h-4 text-white')}
+              gradient="gradient-brand"
+              label="Viajes realizados"
+              value={fmtInt(kpis?.totalViajes ?? 0)}
+              sub={`${kpis?.viajesFinalizados ?? 0} finalizados`}
+              loading={loading}
+            />
+            <KpiCard
+              icon={Ic.pulse('w-4 h-4 text-white')}
+              gradient="gradient-warm"
+              label="Viajes activos"
+              value={fmtInt(kpis?.viajesActivos ?? 0)}
+              sub="en curso ahora"
+              loading={loading}
+            />
+            <KpiCard
+              icon={Ic.shield('w-4 h-4 text-white')}
+              gradient="gradient-success"
+              label="Pólizas activas"
+              value={fmtInt(kpis?.polizasActivas ?? 0)}
+              sub={`${kpis?.recibos ?? 0} recibos emitidos`}
+              loading={loading}
+            />
+            <KpiCard
+              icon={Ic.cash('w-4 h-4 text-white')}
+              gradient="gradient-accent"
+              label="Comisiones"
+              value={`Bs ${fmtBs(kpis?.comisionTotal ?? 0)}`}
+              sub={`Prima total: Bs ${fmtBs(kpis?.primaTotal ?? 0)}`}
+              loading={loading}
+            />
+          </div>
+
+          {/* ─── Vendedores en curso ──────────────────────────────────── */}
+          {enCurso.length > 0 && (
+            <div className="card p-5 sm:p-6 mb-5">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <p className="section-title flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  Vendedores en curso
+                </p>
+                <span className="badge badge-yellow">{enCurso.length} activos</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {enCurso.map(v => (
+                  <div key={v.vendedorId ?? v.nombre}
+                    className="border border-slate-200 rounded-xl p-3 bg-gradient-to-br from-amber-50/40 to-white">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 font-extrabold text-xs flex items-center justify-center shrink-0">
+                        {iniciales(v.nombre)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-800 truncate">{v.nombre}</p>
+                        <p className="text-[11px] text-slate-600 font-mono">{v.cedula}</p>
+                      </div>
+                      <span className="badge badge-yellow text-[10px]">{v.viajesActivos}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ─── Rankings ─────────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+            <RankingCard
+              titulo="Top vendedores por prima"
+              icon={Ic.trend('w-4 h-4 text-white')}
+              gradient="bg-gradient-to-br from-brand-700 to-brand-500"
+              metricaLabel="Prima Bs"
+              data={topPrima}
+              metrica="prima"
+              loading={loading}
+            />
+            <RankingCard
+              titulo="Top vendedores por viajes"
+              icon={Ic.trophy('w-4 h-4 text-white')}
+              gradient="bg-gradient-to-br from-amber-600 to-amber-400"
+              metricaLabel="Viajes"
+              data={topViajes}
+              metrica="viajes"
+              loading={loading}
+            />
+            <RankingCard
+              titulo="Top vendedores por comisión"
+              icon={Ic.cash('w-4 h-4 text-white')}
+              gradient="bg-gradient-to-br from-emerald-600 to-emerald-400"
+              metricaLabel="Comisión Bs"
+              data={topComision}
+              metrica="comision"
+              loading={loading}
+            />
+          </div>
+
+          {/* ─── Métricas secundarias ─────────────────────────────────── */}
+          <div className="card p-5 sm:p-6">
+            <p className="section-title mb-4">Indicadores complementarios</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <MiniStat label="Ticket promedio"   value={`Bs ${fmtBs(kpis?.ticketPromedio ?? 0)}`} />
+              <MiniStat label="Prima en USD"      value={`$ ${fmtBs(kpis?.primaTotalExt ?? 0)}`} />
+              <MiniStat label="Recibos emitidos"  value={fmtInt(kpis?.recibos ?? 0)} />
+              <MiniStat label="% conversión"
+                value={`${kpis && kpis.totalViajes > 0
+                  ? Math.round((kpis.polizasActivas / kpis.totalViajes) * 100)
+                  : 0} %`} />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function KpiCard({ icon, gradient, label, value, sub, loading }: {
+  icon: React.ReactNode; gradient: string; label: string; value: string; sub: string; loading: boolean;
+}) {
+  return (
+    <div className={`relative overflow-hidden ${gradient} rounded-[var(--radius)] p-4 sm:p-5 text-white shadow-[0_6px_20px_-6px_rgba(15,26,90,.35)]`}>
+      <div className="flex items-start justify-between">
+        <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+          {icon}
+        </div>
+        {loading && <Spinner size="sm" color="white" />}
+      </div>
+      <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] opacity-80 mt-3">{label}</p>
+      <p className="text-2xl sm:text-[1.7rem] font-extrabold leading-tight mt-1 tabular-nums">{value}</p>
+      <p className="text-[11px] opacity-70 mt-0.5 font-medium truncate">{sub}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+      <p className="stat-label">{label}</p>
+      <p className="text-sm sm:text-base font-extrabold text-slate-800 tabular-nums mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function iniciales(nombre: string): string {
+  return nombre.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
+}
+
+function RankingCard({ titulo, icon, gradient, metricaLabel, data, metrica, loading }: {
+  titulo: string;
+  icon: React.ReactNode;
+  gradient: string;
+  metricaLabel: string;
+  data: RankingVendedor[];
+  metrica: 'viajes' | 'prima' | 'comision';
+  loading: boolean;
+}) {
+  const valor = (v: RankingVendedor) =>
+    metrica === 'viajes' ? fmtInt(v.totalViajes)
+    : metrica === 'prima' ? fmtBs(v.primaGenerada)
+    : fmtBs(v.comisionGenerada);
+  const max = Math.max(
+    1,
+    ...data.map(v => metrica === 'viajes' ? v.totalViajes : metrica === 'prima' ? v.primaGenerada : v.comisionGenerada),
+  );
+  return (
+    <div className="card p-4 sm:p-5 flex flex-col">
+      <div className="flex items-center justify-between mb-3">
+        <p className="section-title text-[11px]">{titulo}</p>
+        <div className={`w-7 h-7 rounded-lg ${gradient} flex items-center justify-center shrink-0`}>
+          {icon}
+        </div>
+      </div>
+      {loading && data.length === 0 && (
+        <div className="py-6 flex items-center justify-center text-slate-500"><Spinner /></div>
+      )}
+      {!loading && data.length === 0 && (
+        <p className="text-xs text-slate-600 py-6 text-center">Aún no hay datos</p>
+      )}
+      <div className="space-y-2.5">
+        {data.map((v, i) => {
+          const val = metrica === 'viajes' ? v.totalViajes : metrica === 'prima' ? v.primaGenerada : v.comisionGenerada;
+          const pct = (val / max) * 100;
+          return (
+            <div key={(v.vendedorId ?? '') + i}>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-extrabold flex items-center justify-center shrink-0">
+                    {i + 1}
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 truncate">{v.nombre}</span>
+                </div>
+                <span className="text-[11px] font-extrabold tabular-nums text-slate-700 shrink-0">{valor(v)}</span>
+              </div>
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all"
+                  style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #2e6dbf, #0f1a5a)' }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {data.length > 0 && (
+        <p className="text-[10px] text-slate-500 mt-3 text-right">{metricaLabel}</p>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   VENDEDORES PANEL — CRUD de vendedores del tenant
+// ═════════════════════════════════════════════════════════════════════════════
+
+function VendedoresPanel({ pushNotif }: { pushNotif: (tipo: Notif['tipo'], titulo: string, msg: string) => void }) {
+  const [list, setList] = useState<Vendedor[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Vendedor | null>(null);
+  const [form, setForm] = useState({
+    nombre: '', apellido: '', cedula: '', telefono: '', email: '', porcentajeComision: 10,
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await vendedorApi.listar();
+      setList(r.data);
+    } catch {
+      pushNotif('error', 'Error', 'No se pudieron cargar los vendedores');
+    } finally {
+      setLoading(false);
+    }
+  }, [pushNotif]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const resetForm = () => {
+    setForm({ nombre: '', apellido: '', cedula: '', telefono: '', email: '', porcentajeComision: 10 });
+    setEditing(null);
+    setShowForm(false);
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editing) {
+        await vendedorApi.actualizar(editing.id, form);
+        pushNotif('success', 'Vendedor actualizado', form.nombre);
+      } else {
+        await vendedorApi.crear({ ...form, estado: 'ACTIVO' });
+        pushNotif('success', 'Vendedor creado', form.nombre);
+      }
+      resetForm();
+      load();
+    } catch (e: any) {
+      pushNotif('error', 'Error', e?.response?.data?.message ?? 'No se pudo guardar');
+    }
+  };
+
+  const startEdit = (v: Vendedor) => {
+    setEditing(v);
+    setForm({
+      nombre: v.nombre,
+      apellido: v.apellido ?? '',
+      cedula: v.cedula,
+      telefono: v.telefono ?? '',
+      email: v.email ?? '',
+      porcentajeComision: v.porcentajeComision,
+    });
+    setShowForm(true);
+  };
+
+  const desactivar = async (v: Vendedor) => {
+    if (!confirm(`¿Desactivar al vendedor ${v.nombre}?`)) return;
+    try {
+      await vendedorApi.eliminar(v.id);
+      pushNotif('info', 'Vendedor desactivado', v.nombre);
+      load();
+    } catch {
+      pushNotif('error', 'Error', 'No se pudo desactivar');
+    }
+  };
+
+  return (
+    <div className="animate-in">
+      <PageHeader
+        title="Vendedores"
+        subtitle="Gestiona la fuerza comercial que suscribe pólizas"
+        action={
+          <button onClick={() => { resetForm(); setShowForm(true); }}
+            className="btn-primary h-9 text-xs px-3 flex items-center gap-1.5">
+            {Ic.plus()} Nuevo vendedor
+          </button>
+        }
+      />
+
+      {showForm && (
+        <div className="card p-5 sm:p-6 mb-5">
+          <p className="section-title mb-4">{editing ? 'Editar vendedor' : 'Nuevo vendedor'}</p>
+          <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="label">Nombre *</label>
+              <input className="input" value={form.nombre}
+                onChange={e => setForm({ ...form, nombre: e.target.value })} required />
+            </div>
+            <div>
+              <label className="label">Apellido</label>
+              <input className="input" value={form.apellido}
+                onChange={e => setForm({ ...form, apellido: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Cédula / RIF *</label>
+              <input className="input" value={form.cedula}
+                onChange={e => setForm({ ...form, cedula: e.target.value })}
+                placeholder="V12345678" required disabled={!!editing} />
+            </div>
+            <div>
+              <label className="label">Teléfono</label>
+              <input className="input" value={form.telefono}
+                onChange={e => setForm({ ...form, telefono: e.target.value })}
+                placeholder="+58424…" />
+            </div>
+            <div>
+              <label className="label">Correo</label>
+              <input className="input" type="email" value={form.email}
+                onChange={e => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">% Comisión</label>
+              <input className="input" type="number" step="0.5" min="0" max="100"
+                value={form.porcentajeComision}
+                onChange={e => setForm({ ...form, porcentajeComision: parseFloat(e.target.value) || 0 })} />
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3 flex gap-2 justify-end">
+              <button type="button" onClick={resetForm} className="btn-secondary text-xs px-4">Cancelar</button>
+              <button type="submit" className="btn-primary text-xs px-4">
+                {editing ? 'Guardar cambios' : 'Crear vendedor'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="card overflow-hidden">
+        {loading && list.length === 0 ? (
+          <div className="py-16 flex items-center justify-center"><Spinner size="lg" /></div>
+        ) : list.length === 0 ? (
+          <EmptyState icon={Ic.users('w-6 h-6')} title="Sin vendedores"
+            sub="Agrega el primer vendedor de tu equipo comercial" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Vendedor</th>
+                  <th>Cédula</th>
+                  <th className="hidden md:table-cell">Contacto</th>
+                  <th>% Comisión</th>
+                  <th>Estado</th>
+                  <th className="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map(v => (
+                  <tr key={v.id}>
+                    <td>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 text-xs font-extrabold flex items-center justify-center shrink-0">
+                          {iniciales(`${v.nombre} ${v.apellido ?? ''}`)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate">{v.nombre} {v.apellido}</p>
+                          <p className="text-[11px] text-slate-600 truncate md:hidden">{v.email || v.telefono || '—'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="font-mono text-xs">{v.cedula}</td>
+                    <td className="hidden md:table-cell text-xs text-slate-700">
+                      <div>{v.email || '—'}</div>
+                      <div className="text-slate-500">{v.telefono || '—'}</div>
+                    </td>
+                    <td className="font-bold text-sm tabular-nums">{v.porcentajeComision} %</td>
+                    <td>
+                      <span className={
+                        v.estado === 'ACTIVO' ? 'badge badge-green'
+                        : v.estado === 'SUSPENDIDO' ? 'badge badge-yellow'
+                        : 'badge badge-gray'
+                      }>{v.estado}</span>
+                    </td>
+                    <td>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => startEdit(v)}
+                          className="text-xs text-brand-600 hover:text-brand-800 font-bold px-2 py-1">
+                          Editar
+                        </button>
+                        {v.estado === 'ACTIVO' && (
+                          <button onClick={() => desactivar(v)}
+                            className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1">
+                            Desactivar
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   CARTERA PANEL — vista admin: KPIs globales + lista de tenants/clientes
+// ═════════════════════════════════════════════════════════════════════════════
+
+function CarteraPanel({ adminKey, setAdminKey }: { adminKey: string; setAdminKey: (s: string) => void }) {
+  const [global, setGlobal] = useState<KpisGlobales | null>(null);
+  const [cartera, setCartera] = useState<CarteraCliente[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    if (!adminKey.trim()) {
+      setErr('Ingresa una Admin Key para ver la cartera global');
+      return;
+    }
+    setLoading(true); setErr('');
+    try {
+      const [g, c] = await Promise.all([
+        dashboardApi.global(adminKey),
+        dashboardApi.cartera(adminKey),
+      ]);
+      setGlobal(g.data);
+      setCartera(c.data);
+    } catch (e: any) {
+      setErr(e?.response?.data?.message ?? 'Admin Key inválida o error de conexión');
+      setGlobal(null);
+      setCartera([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [adminKey]);
+
+  return (
+    <div className="animate-in">
+      <PageHeader
+        title="Cartera de Clientes"
+        subtitle="Visión consolidada de todos los clientes de la plataforma (vista administrativa)"
+      />
+
+      <div className="card p-4 sm:p-5 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+          <div>
+            <label className="label">Admin Key</label>
+            <input type="password" className="input"
+              value={adminKey}
+              onChange={e => setAdminKey(e.target.value)}
+              placeholder="ADMIN_SECRET del servidor" />
+          </div>
+          <button onClick={load} className="btn-primary h-10 px-4 text-xs flex items-center gap-1.5"
+            disabled={loading}>
+            {loading ? <Spinner size="sm" /> : Ic.refresh()} Cargar cartera
+          </button>
+        </div>
+        {err && <p className="text-xs font-bold text-red-600 mt-3">{err}</p>}
+      </div>
+
+      {global && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-5 stagger">
+          <KpiCard
+            icon={Ic.shield('w-4 h-4 text-white')}
+            gradient="gradient-brand"
+            label="Clientes activos"
+            value={fmtInt(global.totalTenants)}
+            sub={`${global.totalVendedores} vendedores`}
+            loading={false}
+          />
+          <KpiCard
+            icon={Ic.rows('w-4 h-4 text-white')}
+            gradient="gradient-success"
+            label="Viajes totales"
+            value={fmtInt(global.totalViajes)}
+            sub={`${global.viajesActivos} activos`}
+            loading={false}
+          />
+          <KpiCard
+            icon={Ic.shield('w-4 h-4 text-white')}
+            gradient="gradient-warm"
+            label="Pólizas activas"
+            value={fmtInt(global.polizasActivas)}
+            sub={`${global.recibos} recibos`}
+            loading={false}
+          />
+          <KpiCard
+            icon={Ic.cash('w-4 h-4 text-white')}
+            gradient="gradient-accent"
+            label="Prima global"
+            value={`Bs ${fmtBs(global.primaTotal)}`}
+            sub={`$ ${fmtBs(global.primaTotalExt)}`}
+            loading={false}
+          />
+          <KpiCard
+            icon={Ic.trend('w-4 h-4 text-white')}
+            gradient="bg-gradient-to-br from-emerald-600 to-emerald-400"
+            label="Comisiones"
+            value={`Bs ${fmtBs(global.comisionTotal)}`}
+            sub="generadas en total"
+            loading={false}
+          />
+        </div>
+      )}
+
+      {cartera.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+            <p className="section-title">Detalle por cliente</p>
+            <span className="badge badge-blue">{cartera.length} clientes</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th className="text-right">Viajes</th>
+                  <th className="text-right hidden sm:table-cell">Activos</th>
+                  <th className="text-right">Prima Bs</th>
+                  <th className="text-right">Comisión Bs</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cartera.map(c => (
+                  <tr key={c.id}>
+                    <td>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-700 to-brand-500 text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">
+                          {iniciales(c.nombre)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate">{c.nombre}</p>
+                          <p className="text-[10px] text-slate-500 font-mono truncate">{c.id}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="text-right font-bold tabular-nums">{fmtInt(c.totalViajes)}</td>
+                    <td className="text-right tabular-nums hidden sm:table-cell">
+                      {c.viajesActivos > 0
+                        ? <span className="badge badge-yellow">{c.viajesActivos}</span>
+                        : <span className="text-slate-400">0</span>}
+                    </td>
+                    <td className="text-right font-bold tabular-nums text-brand-700">{fmtBs(c.primaTotal)}</td>
+                    <td className="text-right font-bold tabular-nums text-emerald-600">{fmtBs(c.comisionTotal)}</td>
+                    <td>
+                      <span className={c.activo ? 'badge badge-green' : 'badge badge-gray'}>
+                        {c.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!global && !err && !loading && (
+        <EmptyState
+          icon={Ic.shield('w-6 h-6')}
+          title="Carga la cartera"
+          sub="Ingresa tu Admin Key arriba para ver los datos consolidados de todos los clientes"
+        />
+      )}
     </div>
   );
 }

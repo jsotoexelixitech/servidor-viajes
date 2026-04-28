@@ -18,6 +18,8 @@ import { TenantModule } from './modules/tenant/tenant.module';
 import { HealthModule } from './modules/health/health.module';
 import { SeguroModule } from './modules/seguro/seguro.module';
 import { VehiculoModule } from './modules/vehiculo/vehiculo.module';
+import { VendedorModule } from './modules/vendedor/vendedor.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -117,6 +119,8 @@ import { EnvValidatorService } from './common/env-validator.service';
     SeguroModule,
     HealthModule,
     VehiculoModule,
+    VendedorModule,
+    DashboardModule,
   ],
   providers: [
     // Rate limiting global
