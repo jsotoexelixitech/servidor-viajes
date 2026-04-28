@@ -4,18 +4,31 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Paleta oficial — Manual de Identidad La Mundial de Seguros
         brand: {
-          50:  '#f0f4ff',
-          100: '#e0e9ff',
-          200: '#c7d7fe',
-          300: '#a5bbfc',
-          400: '#8096f8',
-          500: '#6171f3',
-          600: '#4d55e8',
-          700: '#3e42ce',
-          800: '#3337a6',
-          900: '#2d3184',
-          950: '#1c1f52',
+          50:  '#eaf1fb',
+          100: '#d2dff5',
+          200: '#a6c0e9',
+          300: '#7aa1de',
+          400: '#4a8dd5', // Azul claro logo
+          500: '#2e6dbf', // Azul brillante logo
+          600: '#162a7f', // Pennsylvania claro
+          700: '#0f1a5a', // Pennsylvania principal
+          800: '#0b1547',
+          900: '#091133', // Pennsylvania oscuro
+          950: '#050a22',
+        },
+        accent: {
+          50:  '#ffeded',
+          100: '#ffd7d8',
+          200: '#ffb1b3',
+          300: '#ff8a8d',
+          400: '#ff6675', // Imperial claro
+          500: '#e84f51', // Imperial principal
+          600: '#c63a3c',
+          700: '#a02a2c',
+          800: '#7a1f21',
+          900: '#5a1517',
         },
       },
       fontFamily: {
