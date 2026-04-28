@@ -4,6 +4,8 @@ import {
   authApi, setSessionToken, clearSession, viajeApi, tenantApi, adminApi,
   Viaje, CAMPOS_SEGURO, SeguroConfig, FRECUENCIAS, CampoSeguro,
 } from './api';
+import { setDemoMode, isDemoMode, DEMO_INFO, buildDemoViajeBody } from './demo';
+import { WelcomeSplash } from './WelcomeSplash';
 
 type Tab = 'dashboard' | 'setup' | 'mapeo' | 'viaje' | 'finalizar' | 'listar' | 'monitor';
 type ReqStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -79,7 +81,7 @@ function CopyButton({ text, compact }: { text: string; compact?: boolean }) {
   if (compact) {
     return (
       <button onClick={copy} title="Copiar"
-        className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all active:scale-90">
+        className="p-1 rounded-md text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all active:scale-90">
         {st === 'copied' ? Ic.check('w-3.5 h-3.5 text-emerald-500') : Ic.copy()}
       </button>
     );
@@ -175,11 +177,11 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle: stri
 function EmptyState({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
   return (
     <div className="card p-16 flex flex-col items-center justify-center text-center animate-in">
-      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 mb-4">
+      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 mb-4">
         {icon}
       </div>
       <p className="font-bold text-slate-600">{title}</p>
-      {sub && <p className="text-sm text-slate-400 mt-1">{sub}</p>}
+      {sub && <p className="text-sm text-slate-600 mt-1">{sub}</p>}
     </div>
   );
 }
@@ -203,8 +205,8 @@ function FieldRow({ campo, mappedVal, defVal, onMap, onClear }: {
   const isMapped = mappedVal.trim() !== '';
   return (
     <div className={[
-      'grid items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-150',
-      'grid-cols-[minmax(0,1fr)_20px_minmax(0,1fr)_72px]',
+      'grid items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-2.5 rounded-xl border transition-all duration-150',
+      'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_60px] sm:grid-cols-[minmax(0,1fr)_20px_minmax(0,1fr)_72px]',
       isMapped  ? 'bg-brand-50/60 border-brand-200/70'
         : defVal ? 'bg-emerald-50/50 border-emerald-100'
         : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/40',
@@ -217,10 +219,10 @@ function FieldRow({ campo, mappedVal, defVal, onMap, onClear }: {
           </code>
           {campo.requerido && <span className="text-red-400 text-[10px] font-bold leading-none shrink-0">REQ</span>}
         </div>
-        <p className="text-[11px] text-slate-400 truncate">{campo.descripcion}</p>
+        <p className="text-[11px] text-slate-600 truncate">{campo.descripcion}</p>
       </div>
       {/* arrow */}
-      <span className="text-slate-200 font-bold text-center select-none">←</span>
+      <span className="text-slate-200 font-bold text-center select-none hidden sm:block">←</span>
       {/* right: custom name */}
       <div className="flex items-center gap-1 min-w-0">
         <input
@@ -231,7 +233,7 @@ function FieldRow({ campo, mappedVal, defVal, onMap, onClear }: {
         />
         {isMapped && (
           <button type="button" onClick={onClear}
-            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-slate-300 hover:text-red-400 hover:bg-red-50 transition-all">
+            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-slate-500 hover:text-red-400 hover:bg-red-50 transition-all">
             {Ic.close()}
           </button>
         )}
@@ -242,10 +244,180 @@ function FieldRow({ campo, mappedVal, defVal, onMap, onClear }: {
   );
 }
 
+// ─── Modal: Vista previa de Póliza (modo demo) ────────────────────────────────
+function PolizaModal({ viaje, onClose }: { viaje: Viaje; onClose: () => void }) {
+  const print = () => window.print();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const fechaEmision = new Date(viaje.creadoEn);
+  const fechaVigencia = new Date(fechaEmision.getTime() + 365 * 24 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toLocaleDateString('es-VE', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in poliza-modal-overlay"
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[96vh] sm:max-h-[92vh] overflow-hidden flex flex-col poliza-modal-content">
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-slate-50 no-print">
+          <div className="flex items-center gap-3">
+            <span className="badge bg-amber-100 text-amber-800 ring-1 ring-amber-200">DEMO</span>
+            <span className="text-sm font-bold text-slate-700">Vista previa · Póliza {viaje.cnpoliza}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={print} className="btn-secondary text-xs h-8 py-0 px-3">
+              Imprimir / Guardar PDF
+            </button>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all">
+              {Ic.close()}
+            </button>
+          </div>
+        </div>
+
+        {/* Documento */}
+        <div className="overflow-y-auto p-5 sm:p-8 poliza-doc">
+          <div className="flex items-start justify-between gap-3 border-b-4 border-brand-600 pb-4 sm:pb-5 mb-5 sm:mb-6">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-xl font-extrabold text-brand-700 tracking-tight leading-tight">PÓLIZA DE RESPONSABILIDAD CIVIL VEHICULAR</h1>
+              <p className="text-[11px] sm:text-xs text-slate-700 mt-1.5 font-medium">Plan RCV Básico · Ramo 18 · Cobertura Anual</p>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white ring-1 ring-slate-200 flex items-center justify-center ml-auto p-1"
+                style={{ boxShadow: '0 3px 8px -1px rgb(15 26 90 / .15)' }}>
+                <img src="/logo-isotipo-transparente.png" alt="La Mundial" className="w-full h-full object-contain" />
+              </div>
+              <p className="text-[10px] text-slate-600 mt-1.5 font-bold uppercase tracking-wider hidden sm:block">Documento Oficial</p>
+            </div>
+          </div>
+
+          {/* Datos generales */}
+          <div className="grid grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-3 mb-5 sm:mb-6 text-sm">
+            <div>
+              <p className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider mb-0.5">N° de Póliza</p>
+              <p className="font-mono font-extrabold text-slate-900 text-base">{viaje.cnpoliza}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider mb-0.5">N° de Recibo</p>
+              <p className="font-mono font-extrabold text-slate-900 text-base">{viaje.cnrecibo}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider mb-0.5">Fecha de Emisión</p>
+              <p className="font-bold text-slate-900">{fmt(fechaEmision)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider mb-0.5">Vigencia hasta</p>
+              <p className="font-bold text-slate-900">{fmt(fechaVigencia)}</p>
+            </div>
+          </div>
+
+          {/* Tomador / Conductor */}
+          <div className="bg-slate-50 rounded-xl p-4 sm:p-5 mb-4 sm:mb-5 border border-slate-200">
+            <p className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider mb-3">Datos del Tomador</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+              <div>
+                <p className="text-[11px] text-slate-700 font-semibold mb-0.5">Nombre completo</p>
+                <p className="font-bold text-slate-900">{viaje.nombreConductor}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-slate-700 font-semibold mb-0.5">Tenant ID</p>
+                <p className="font-mono text-xs text-slate-700 truncate">{viaje.tenantId}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Vehículo */}
+          <div className="bg-slate-50 rounded-xl p-4 sm:p-5 mb-4 sm:mb-5 border border-slate-200">
+            <p className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider mb-3">Vehículo asegurado</p>
+            <div className="grid grid-cols-3 gap-3 sm:gap-4 text-sm">
+              <div>
+                <p className="text-[11px] text-slate-700 font-semibold mb-0.5">Placa</p>
+                <p className="font-mono font-extrabold text-slate-900">{viaje.numeroPlaca}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-700 font-semibold mb-0.5">Modelo</p>
+                <p className="font-bold text-slate-900">{viaje.modeloVehiculo}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-700 font-semibold mb-0.5">Año</p>
+                <p className="font-bold text-slate-900">{viaje.anioVehiculo}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Coberturas */}
+          <div className="border border-slate-200 rounded-xl mb-5 overflow-hidden">
+            <div className="bg-brand-50 px-5 py-2.5 border-b border-slate-200">
+              <p className="text-[11px] font-extrabold text-brand-700 uppercase tracking-wider">Coberturas Incluidas</p>
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {[
+                  ['Daños a personas', 'Bs. 500.000,00'],
+                  ['Daños a cosas', 'Bs. 500.000,00'],
+                  ['Defensa Penal', 'Bs. 50.000,00'],
+                  ['Asistencia en carretera', 'Incluido'],
+                ].map(([label, val]) => (
+                  <tr key={label} className="border-t border-slate-100 first:border-t-0">
+                    <td className="px-5 py-2.5 text-slate-700">{label}</td>
+                    <td className="px-5 py-2.5 text-right font-mono font-bold text-slate-900">{val}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Coordenadas del viaje */}
+          <div className="border border-slate-200 rounded-xl p-4 mb-5 text-xs">
+            <p className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider mb-2">Trayecto registrado</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <p className="text-slate-700 font-semibold mb-0.5">Origen</p>
+                <p className="font-mono text-slate-800">{viaje.latInicio.toFixed(4)}, {viaje.lngInicio.toFixed(4)}</p>
+              </div>
+              <div>
+                <p className="text-slate-700 font-semibold mb-0.5">Destino</p>
+                <p className="font-mono text-slate-800">{viaje.latDestino.toFixed(4)}, {viaje.lngDestino.toFixed(4)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="text-center text-[10px] text-slate-700 mt-8 pt-5 border-t border-slate-200 leading-relaxed">
+            <p className="font-bold text-slate-700">Documento generado por el Sistema Ridery Seguros · ExelixiTech</p>
+            <p className="mt-1">Este es un documento de demostración generado automáticamente. No tiene validez legal.</p>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          .poliza-doc, .poliza-doc * { visibility: visible; }
+          .poliza-modal-overlay { position: static !important; background: white !important; backdrop-filter: none !important; padding: 0 !important; }
+          .poliza-modal-content { box-shadow: none !important; border-radius: 0 !important; max-height: none !important; max-width: none !important; }
+          .no-print { display: none !important; }
+          @page { size: A4; margin: 12mm; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [demoOn, setDemoOn] = useState(isDemoMode());
 
   const [apiKeyInput,   setApiKeyInput]   = useState('');
   const [apiKeySet,     setApiKeySet]     = useState(false);
@@ -285,6 +457,9 @@ export default function App() {
   // Monitor
   const [monitorData,    setMonitorData]    = useState<Record<string, unknown> | null>(null);
   const [monitorLoading, setMonitorLoading] = useState(false);
+
+  // Modal de vista previa de póliza (modo demo)
+  const [polizaPreview, setPolizaPreview] = useState<Viaje | null>(null);
 
   // ── Notificaciones ────────────────────────────────────────────────────────
   const pushNotif = useCallback((tipo: Notif['tipo'], titulo: string, mensaje: string) => {
@@ -341,6 +516,47 @@ export default function App() {
       setApiKeyLoading(false);
     }
   };
+
+  const toggleDemo = useCallback(async () => {
+    const next = !demoOn;
+    setDemoMode(next);
+    setDemoOn(next);
+    if (next) {
+      try {
+        const res = await authApi.login(DEMO_INFO.apiKey);
+        setSessionToken(res.data.sessionToken);
+        setApiKeySet(true);
+        setApiKeyInput('');
+        setApiKeyError('');
+        setTenantNombreConectado(res.data.tenant.nombre);
+
+        setTenantNombre(DEMO_INFO.setupNombre);
+        setTenantWebhook(DEMO_INFO.setupWebhook);
+        setTenantSecret(DEMO_INFO.setupSecret);
+        setAdminKeyInput(DEMO_INFO.adminKey);
+
+        setViajeRaw(JSON.stringify(buildDemoViajeBody(), null, 2));
+
+        pushNotif('success', 'Modo Demo activado',
+          'Cliente, configuración y 8 viajes precargados. Listo para presentar.');
+      } catch {
+        pushNotif('error', 'Modo Demo', 'No se pudo iniciar sesión simulada.');
+      }
+    } else {
+      clearSession();
+      setApiKeySet(false);
+      setTenantNombreConectado('');
+      setTenantNombre('');
+      setTenantWebhook('');
+      setTenantSecret('');
+      setAdminKeyInput('');
+      setViajeRaw('');
+      setIdViaje('');
+      setResponse(null);
+      setReqStatus('idle');
+      pushNotif('info', 'Modo Demo desactivado', 'Conecta con tu API Key real para continuar.');
+    }
+  }, [demoOn, pushNotif]);
 
   const doRequest = useCallback(async (fn: () => Promise<unknown>): Promise<boolean> => {
     setReqStatus('loading'); setResponse(null);
@@ -425,7 +641,7 @@ export default function App() {
     if (ok) { setMapeoSaved(true); setTimeout(() => setMapeoSaved(false), 3000); }
   };
 
-  const handleIniciar = (e: FormEvent) => {
+  const handleIniciar = async (e: FormEvent) => {
     e.preventDefault();
     if (!viajeRaw.trim()) {
       setResponse({ error: 'El body JSON no puede estar vacío.' });
@@ -435,7 +651,24 @@ export default function App() {
     let parsed: unknown;
     try { parsed = JSON.parse(viajeRaw); }
     catch { setResponse({ error: 'JSON inválido. Verifica el formato.' }); setReqStatus('error'); return; }
-    doRequest(() => viajeApi.iniciar(parsed as Record<string, unknown>));
+    setReqStatus('loading'); setResponse(null);
+    try {
+      const r = await viajeApi.iniciar(parsed as Record<string, unknown>);
+      setResponse(r.data);
+      setReqStatus('success');
+      if (r.data?.id) setIdViaje(r.data.id);
+      if (demoOn) {
+        pushNotif('success', 'Viaje iniciado',
+          `Póliza ${r.data.cnpoliza ?? ''} emitida para placa ${r.data.numeroPlaca}`);
+        setViajeRaw(JSON.stringify(buildDemoViajeBody(), null, 2));
+      }
+    } catch (e2: unknown) {
+      const err = e2 as { response?: { data: unknown }; message: string };
+      setResponse(err.response?.data ?? { error: err.message });
+      setReqStatus('error');
+      const { titulo, mensaje } = friendlyError(e2);
+      pushNotif('error', titulo, mensaje);
+    }
   };
 
   const handleFinalizar = (e: FormEvent) => { e.preventDefault(); doRequest(() => viajeApi.finalizar(idViaje)); };
@@ -461,7 +694,18 @@ export default function App() {
   const navTo = (id: Tab) => {
     if (NAV_REQUIRES_KEY.has(id) && !apiKeySet) return;
     setTab(id); setReqStatus('idle'); setResponse(null);
+    if (window.innerWidth < 1024) setSidebarOpen(false);
   };
+
+  useEffect(() => {
+    const handler = () => {
+      if (window.innerWidth < 1024) setSidebarOpen(false);
+      else setSidebarOpen(true);
+    };
+    handler();
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   const NAV: { id: Tab; label: string; icon: () => React.ReactNode; dot?: boolean; requiresKey?: boolean }[] = [
     { id: 'dashboard', label: 'Dashboard',     icon: () => Ic.grid() },
@@ -476,88 +720,106 @@ export default function App() {
   // ═══════════════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen flex flex-col bg-[#f4f6fb]">
+      <WelcomeSplash />
       <Toaster position="top-right" toastOptions={{
         style: { fontSize: '12px', fontWeight: 600, borderRadius: '10px', maxWidth: '360px' },
         success: { style: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' } },
         error:   { style: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' } },
       }} />
 
+      {polizaPreview && <PolizaModal viaje={polizaPreview} onClose={() => setPolizaPreview(null)} />}
+
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="h-14 bg-white border-b border-slate-100 sticky top-0 z-40"
         style={{ boxShadow: '0 1px 0 #e2e8f0, 0 2px 8px -2px rgb(0 0 0/.04)' }}>
-        <div className="h-full px-4 flex items-center gap-4 max-w-screen-2xl mx-auto">
+        <div className="h-full px-3 sm:px-4 flex items-center gap-2 sm:gap-4 max-w-screen-2xl mx-auto">
 
           {/* Sidebar toggle */}
           <button onClick={() => setSidebarOpen(s => !s)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-all shrink-0"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-700 transition-all shrink-0"
             title={sidebarOpen ? 'Colapsar menú' : 'Expandir menú'}>
             <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               {sidebarOpen ? <><path d="M2 4h12M2 8h12M2 12h12"/></> : <><path d="M2 4h12M2 8h8M2 12h12"/></>}
             </svg>
           </button>
 
-          {/* Brand */}
+          {/* Brand — La Mundial de Seguros */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 rounded-xl gradient-brand flex items-center justify-center shrink-0"
-              style={{ boxShadow: '0 3px 8px -1px rgb(77 85 232 / .35)' }}>
-              {Ic.shield('w-4 h-4 text-white')}
+            <div className="w-9 h-9 rounded-xl bg-white ring-1 ring-slate-200 flex items-center justify-center shrink-0 p-1"
+              style={{ boxShadow: '0 3px 8px -1px rgb(15 26 90 / .15)' }}>
+              <img src="/logo-isotipo-transparente.png" alt="La Mundial" className="w-full h-full object-contain" />
             </div>
             <div className="leading-none hidden sm:block">
-              <span className="block text-sm font-extrabold text-slate-900 tracking-tight">Ridery</span>
-              <span className="block text-[9px] text-slate-400 font-bold tracking-[0.12em] uppercase">Seguros</span>
+              <span className="block text-sm font-extrabold tracking-tight" style={{ color: '#0F1A5A' }}>La Mundial</span>
+              <span className="block text-[9px] font-bold tracking-[0.12em] uppercase italic" style={{ color: '#E84F51' }}>de Seguros</span>
             </div>
           </div>
 
-          <div className="w-px h-5 bg-slate-100 shrink-0" />
+          <div className="w-px h-5 bg-slate-100 shrink-0 hidden sm:block" />
 
           {/* API Key area */}
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 max-w-md">
+            <div className="relative flex-1 min-w-0">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none hidden sm:block">
                 {Ic.key('w-3.5 h-3.5')}
               </span>
               <input
                 ref={apiKeyRef}
                 type={apiKeyVis ? 'text' : 'password'}
-                placeholder="API Key del cliente…"
+                placeholder="API Key…"
                 value={apiKeyInput}
                 onChange={e => { setApiKeyInput(e.target.value); setApiKeyError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleSetApiKey()}
-                className="input pl-8 pr-8 h-8 text-xs rounded-lg"
+                className="input pl-3 sm:pl-8 pr-8 h-8 text-xs rounded-lg w-full"
               />
               <button onClick={() => setApiKeyVis(v => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 transition-colors">
                 {Ic.eye('w-3.5 h-3.5')}
               </button>
             </div>
             <button onClick={handleSetApiKey} disabled={apiKeyLoading || !apiKeyInput.trim()}
-              className="btn-primary h-8 text-xs px-3.5 rounded-lg whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+              className="btn-primary h-8 text-xs px-2.5 sm:px-3.5 rounded-lg whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
               {apiKeyLoading && <Spinner size="sm" />}
-              {apiKeySet ? 'Actualizar' : 'Conectar'}
+              <span className="hidden sm:inline">{apiKeySet ? 'Actualizar' : 'Conectar'}</span>
+              <span className="sm:hidden">{apiKeySet ? 'Upd' : 'Go'}</span>
             </button>
             {apiKeyError && (
-              <span className="text-[10.5px] font-bold text-red-500 whitespace-nowrap shrink-0">{apiKeyError}</span>
+              <span className="text-[10.5px] font-bold text-red-500 whitespace-nowrap shrink-0 hidden md:inline">{apiKeyError}</span>
             )}
             {apiKeySet && !apiKeyError && (
-              <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-emerald-600 bg-emerald-50 ring-1 ring-inset ring-emerald-200/70 px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {tenantNombreConectado ? tenantNombreConectado : 'Conectado'}
+              <div className="hidden md:flex items-center gap-1.5 text-[10.5px] font-bold text-emerald-600 bg-emerald-50 ring-1 ring-inset ring-emerald-200/70 px-2.5 py-1 rounded-full whitespace-nowrap shrink-0 max-w-[180px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="truncate">{tenantNombreConectado ? tenantNombreConectado : 'Conectado'}</span>
               </div>
             )}
           </div>
 
+          {/* Demo toggle */}
+          <button
+            onClick={toggleDemo}
+            title={demoOn ? 'Desactivar modo demo' : 'Activar modo demo (datos simulados)'}
+            className={`h-8 px-2 sm:px-3 rounded-lg text-[11px] font-bold tracking-wide flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0 transition-all ${
+              demoOn
+                ? 'bg-amber-500 text-white shadow-[0_3px_10px_-2px_rgba(245,158,11,.5)] hover:bg-amber-600'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 ring-1 ring-inset ring-slate-200'
+            }`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${demoOn ? 'bg-white animate-pulse' : 'bg-slate-400'}`} />
+            <span className="hidden sm:inline">{demoOn ? 'DEMO ACTIVO' : 'Modo Demo'}</span>
+            <span className="sm:hidden">{demoOn ? 'DEMO' : 'Demo'}</span>
+          </button>
+
           {/* Right slot */}
-          <div className="ml-auto flex items-center gap-3">
-            <span className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            <span className="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
               <span className="kbd">Ctrl</span><span className="kbd">K</span>
               <span className="ml-1">buscar</span>
             </span>
-            <div className="w-px h-4 bg-slate-100 hidden lg:block" />
+            <div className="w-px h-4 bg-slate-100 hidden xl:block" />
 
             {/* Campana de notificaciones */}
             <div className="relative">
               <button onClick={() => setNotifOpen(o => !o)}
-                className="relative w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                className="relative w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                 <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M8 1a5 5 0 0 1 5 5v3l1.5 2H1.5L3 9V6a5 5 0 0 1 5-5z"/>
                   <path d="M6.5 13a1.5 1.5 0 0 0 3 0"/>
@@ -575,14 +837,14 @@ export default function App() {
                     <span className="text-xs font-extrabold text-slate-700">Notificaciones</span>
                     {notifs.length > 0 && (
                       <button onClick={() => setNotifs([])}
-                        className="text-[10px] text-slate-400 hover:text-red-500 transition-colors font-semibold">
+                        className="text-[10px] text-slate-600 hover:text-red-500 transition-colors font-semibold">
                         Limpiar todo
                       </button>
                     )}
                   </div>
                   <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
                     {notifs.length === 0 ? (
-                      <p className="text-center text-xs text-slate-400 py-6">Sin notificaciones</p>
+                      <p className="text-center text-xs text-slate-600 py-6">Sin notificaciones</p>
                     ) : notifs.map(n => (
                       <div key={n.id} className={`flex gap-3 px-4 py-3 text-xs ${
                         n.tipo === 'success' ? 'bg-emerald-50/50' :
@@ -595,7 +857,7 @@ export default function App() {
                         <div className="min-w-0">
                           <p className="font-bold text-slate-700 truncate">{n.titulo}</p>
                           <p className="text-slate-500 mt-0.5">{n.mensaje}</p>
-                          <p className="text-slate-300 mt-1">{n.ts.toLocaleTimeString()}</p>
+                          <p className="text-slate-500 mt-1">{n.ts.toLocaleTimeString()}</p>
                         </div>
                       </div>
                     ))}
@@ -604,19 +866,41 @@ export default function App() {
               )}
             </div>
 
-            <div className="w-px h-4 bg-slate-100" />
-            <span className="text-[11px] text-slate-300 font-semibold hidden lg:block">v2.1</span>
+            <div className="w-px h-4 bg-slate-100 hidden sm:block" />
+            <span className="text-[11px] text-slate-500 font-semibold hidden lg:block">v2.1</span>
           </div>
         </div>
       </header>
 
+      {demoOn && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-[11px] sm:text-[11.5px] font-semibold px-3 sm:px-4 py-1.5 flex items-center justify-center gap-2 text-center flex-wrap">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+          <span className="hidden sm:inline">Modo Demo activo — los datos mostrados son simulados y no afectan el sistema real.</span>
+          <span className="sm:hidden">Modo Demo activo — datos simulados.</span>
+          <button onClick={toggleDemo} className="underline underline-offset-2 hover:text-amber-900 font-bold">
+            Desactivar
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-1 max-w-screen-2xl mx-auto w-full">
 
+        {/* ── Sidebar overlay (móvil) ──────────────────────────────────── */}
+        {sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 top-14 bg-slate-900/40 backdrop-blur-sm z-30 lg:hidden"
+            aria-hidden
+          />
+        )}
+
         {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-        <aside className={`shrink-0 transition-all duration-200 ease-in-out ${sidebarOpen ? 'w-52' : 'w-0 overflow-hidden'}`}>
+        <aside className={`fixed lg:static top-14 left-0 bottom-0 z-40 lg:z-auto bg-[#f4f6fb] shrink-0 transition-transform duration-200 ease-in-out lg:transition-all ${
+          sidebarOpen ? 'translate-x-0 lg:w-52' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:overflow-hidden'
+        }`}>
           <div className="w-52 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto flex flex-col py-4 px-3 gap-0.5">
 
-            <p className="text-[9.5px] font-extrabold text-slate-300 uppercase tracking-[0.14em] px-3 mb-2">
+            <p className="text-[9.5px] font-extrabold text-slate-500 uppercase tracking-[0.14em] px-3 mb-2">
               Menu
             </p>
 
@@ -629,7 +913,7 @@ export default function App() {
                   disabled={disabled}
                   title={disabled ? 'Requiere API Key' : item.label}
                   className={`nav-item ${isActive ? 'nav-active' : disabled ? 'nav-disabled' : 'nav-inactive'}`}>
-                  <span className={`${isActive ? 'text-white/90' : disabled ? 'text-slate-300' : 'text-slate-400'} shrink-0`}>
+                  <span className={`${isActive ? 'text-white/90' : disabled ? 'text-slate-500' : 'text-slate-600'} shrink-0`}>
                     {item.icon()}
                   </span>
                   <span className="flex-1 text-left">{item.label}</span>
@@ -658,7 +942,7 @@ export default function App() {
         </aside>
 
         {/* ── Main ─────────────────────────────────────────────────────────── */}
-        <main className="flex-1 min-w-0 py-7 px-6">
+        <main className="flex-1 min-w-0 py-5 px-3 sm:py-7 sm:px-6">
 
           {/* ══ DASHBOARD ══ */}
           {tab === 'dashboard' && (
@@ -696,7 +980,7 @@ export default function App() {
                         <span className="step-num mt-0.5">{i + 1}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-slate-800">{s.t}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">{s.d}</p>
+                          <p className="text-xs text-slate-600 mt-0.5">{s.d}</p>
                         </div>
                         {s.go && (() => {
                           const needsKey = NAV_REQUIRES_KEY.has(s.go);
@@ -705,7 +989,7 @@ export default function App() {
                             <button onClick={() => navTo(s.go!)} disabled={blocked}
                               title={blocked ? 'Requiere API Key' : undefined}
                               className={`shrink-0 flex items-center gap-0.5 text-xs font-bold transition-colors mt-0.5 ${
-                                blocked ? 'text-slate-300 cursor-not-allowed' : 'text-brand-600 hover:text-brand-800'
+                                blocked ? 'text-slate-500 cursor-not-allowed' : 'text-brand-600 hover:text-brand-800'
                               }`}>
                               Ir {Ic.arrow()}
                             </button>
@@ -728,7 +1012,7 @@ export default function App() {
                       <span className="text-xl mt-0.5 shrink-0">{f.icon}</span>
                       <div>
                         <p className="text-sm font-bold text-slate-800">{f.t}</p>
-                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">{f.d}</p>
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">{f.d}</p>
                       </div>
                     </div>
                   ))}
@@ -752,12 +1036,12 @@ export default function App() {
                         <input className="input pr-10" type={adminKeyVis ? 'text' : 'password'}
                           value={adminKeyInput} onChange={e => setAdminKeyInput(e.target.value)}
                           placeholder="Clave de administración del servidor" required />
-                        <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-600"
                           onClick={() => setAdminKeyVis(v => !v)}>
                           {adminKeyVis ? Ic.eye('w-4 h-4') : Ic.eyeOff('w-4 h-4')}
                         </button>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1">
+                      <p className="text-xs text-slate-600 mt-1.5 flex items-center gap-1">
                         {Ic.info('w-3 h-3')} Valor de ADMIN_SECRET en el servidor
                       </p>
                     </div>
@@ -767,15 +1051,15 @@ export default function App() {
                         placeholder="Ej: Taxis Express C.A." required />
                     </div>
                     <div>
-                      <label className="label">Webhook URL <span className="text-slate-300 normal-case font-normal tracking-normal text-xs">— opcional</span></label>
+                      <label className="label">Webhook URL <span className="text-slate-500 normal-case font-normal tracking-normal text-xs">— opcional</span></label>
                       <input className="input" type="url" value={tenantWebhook} onChange={e => setTenantWebhook(e.target.value)}
                         placeholder="https://tu-sistema.com/api/eventos" />
-                      <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1">
+                      <p className="text-xs text-slate-600 mt-1.5 flex items-center gap-1">
                         {Ic.info('w-3 h-3')} Recibirás notificaciones automáticas de cada evento
                       </p>
                     </div>
                     <div>
-                      <label className="label">Webhook Secret <span className="text-slate-300 normal-case font-normal tracking-normal text-xs">— opcional</span></label>
+                      <label className="label">Webhook Secret <span className="text-slate-500 normal-case font-normal tracking-normal text-xs">— opcional</span></label>
                       <input className="input" type="password" value={tenantSecret} onChange={e => setTenantSecret(e.target.value)}
                         placeholder="Clave HMAC para verificar origen" />
                     </div>
@@ -854,7 +1138,7 @@ export default function App() {
                 }
               />
               {mapeoLoading ? (
-                <div className="card p-16 flex items-center justify-center gap-3 text-slate-400">
+                <div className="card p-16 flex items-center justify-center gap-3 text-slate-600">
                   <Spinner size="lg" /><span className="text-sm font-medium">Cargando configuración…</span>
                 </div>
               ) : (
@@ -910,7 +1194,7 @@ export default function App() {
 
                   {/* 2: Mapeo */}
                   <SectionCard num={2} title="Mapeo de campos">
-                    <p className="text-xs text-slate-400 -mt-2 mb-4 ml-7">
+                    <p className="text-xs text-slate-600 -mt-2 mb-4 ml-7">
                       Izquierda: nombre interno. Derecha: nombre que usa <strong className="text-slate-600">tu empresa</strong>. Vacío = usa el mismo nombre.
                     </p>
                     {/* Group tabs */}
@@ -925,7 +1209,7 @@ export default function App() {
                             ].join(' ')}>
                             <span>{GRUPO_META[g].icon}</span>
                             <span>{GRUPO_META[g].label}</span>
-                            <span className={`text-[10px] font-extrabold ${grupoActivo === g ? 'text-brand-500' : 'text-slate-400'}`}>
+                            <span className={`text-[10px] font-extrabold ${grupoActivo === g ? 'text-brand-500' : 'text-slate-600'}`}>
                               {cnt}/{total}
                             </span>
                           </button>
@@ -933,7 +1217,7 @@ export default function App() {
                       })}
                     </div>
                     {/* Header row */}
-                    <div className="grid grid-cols-[minmax(0,1fr)_20px_minmax(0,1fr)_72px] gap-3 px-3 py-1 mb-1 text-[10px] font-extrabold text-slate-300 uppercase tracking-[0.1em]">
+                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_20px_minmax(0,1fr)_72px] gap-3 px-3 py-1 mb-1 text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.1em]">
                       <span>Campo interno</span><span /><span>Nombre en tu empresa</span><span>Tipo</span>
                     </div>
                     <div className="space-y-1.5">
@@ -950,7 +1234,7 @@ export default function App() {
 
                   {/* 3: Defaults */}
                   <SectionCard num={3} title="Valores por defecto">
-                    <p className="text-xs text-slate-400 -mt-2 mb-4 ml-7">
+                    <p className="text-xs text-slate-600 -mt-2 mb-4 ml-7">
                       Campos que tu empresa <strong className="text-slate-600">no envía</strong> por viaje. El sistema los aplica automáticamente.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -968,7 +1252,7 @@ export default function App() {
                                 className={['input-sm flex-1', val ? 'border-emerald-300/80 bg-emerald-50/40 font-medium text-emerald-800' : ''].join(' ')} />
                               {val && (
                                 <button type="button" onClick={() => clearDefault(campo.key)}
-                                  className="w-5 h-5 flex items-center justify-center rounded-md text-slate-300 hover:text-red-400 hover:bg-red-50 transition-all shrink-0">
+                                  className="w-5 h-5 flex items-center justify-center rounded-md text-slate-500 hover:text-red-400 hover:bg-red-50 transition-all shrink-0">
                                   {Ic.close()}
                                 </button>
                               )}
@@ -993,7 +1277,7 @@ export default function App() {
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <p className="text-xs font-bold text-slate-600">JSON de ejemplo para tu empresa</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">POST /api/viaje/iniciar · según tu mapeo actual</p>
+                        <p className="text-[11px] text-slate-600 mt-0.5">POST /api/viaje/iniciar · según tu mapeo actual</p>
                       </div>
                       <CopyButton text={JSON.stringify(exampleBody, null, 2)} />
                     </div>
@@ -1074,7 +1358,7 @@ export default function App() {
                       <input className="input font-mono text-sm" value={idViaje}
                         onChange={e => setIdViaje(e.target.value)}
                         placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required />
-                      <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1">
+                      <p className="text-xs text-slate-600 mt-1.5 flex items-center gap-1">
                         {Ic.info('w-3 h-3')} Cópialo de la respuesta de "Iniciar Viaje" o de la tabla Viajes
                       </p>
                     </div>
@@ -1107,7 +1391,7 @@ export default function App() {
               />
 
               {totalViajes > 0 && (
-                <p className="text-xs text-slate-400 -mt-4 mb-4 font-medium">
+                <p className="text-xs text-slate-600 -mt-4 mb-4 font-medium">
                   Mostrando <strong className="text-slate-600">{viajes.length}</strong> de <strong className="text-slate-600">{totalViajes}</strong> viajes
                 </p>
               )}
@@ -1122,7 +1406,7 @@ export default function App() {
                       <tbody>
                         {viajes.map(v => (
                           <tr key={v.id}>
-                            <td><code className="text-[11px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">{v.id.substring(0, 8)}…</code></td>
+                            <td><code className="text-[11px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md">{v.id.substring(0, 8)}…</code></td>
                             <td><span className="font-mono font-extrabold text-slate-800">{v.numeroPlaca || '—'}</span></td>
                             <td><span className="text-slate-700 font-medium">{v.nombreConductor || '—'}</span></td>
                             <td><span className="badge badge-blue">{v.estado}</span></td>
@@ -1130,13 +1414,19 @@ export default function App() {
                             <td><span className={POLIZA_BADGE[v.estadoPoliza ?? ''] ?? 'badge badge-gray'}>{v.estadoPoliza || '—'}</span></td>
                             <td>
                               {v.urlPolizaPDF
-                                ? <a href={v.urlPolizaPDF} target="_blank" rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-800 font-semibold text-xs underline underline-offset-2 transition-colors">
-                                    {Ic.link()} Ver PDF
-                                  </a>
+                                ? (demoOn
+                                    ? <button onClick={() => setPolizaPreview(v)}
+                                        className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-800 font-semibold text-xs underline underline-offset-2 transition-colors">
+                                        {Ic.link()} Ver PDF
+                                      </button>
+                                    : <a href={v.urlPolizaPDF} target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-800 font-semibold text-xs underline underline-offset-2 transition-colors">
+                                        {Ic.link()} Ver PDF
+                                      </a>
+                                  )
                                 : <span className="text-slate-200">—</span>}
                             </td>
-                            <td className="text-xs text-slate-400 whitespace-nowrap font-medium">
+                            <td className="text-xs text-slate-600 whitespace-nowrap font-medium">
                               {new Date(v.creadoEn).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}
                             </td>
                           </tr>
@@ -1163,7 +1453,7 @@ export default function App() {
               />
 
               {monitorLoading && !monitorData ? (
-                <div className="card p-16 flex items-center justify-center gap-3 text-slate-400">
+                <div className="card p-16 flex items-center justify-center gap-3 text-slate-600">
                   <Spinner size="lg" /><span className="text-sm font-medium">Cargando monitor…</span>
                 </div>
               ) : monitorData ? (() => {
@@ -1209,11 +1499,11 @@ export default function App() {
                             <tbody>
                               {d.viajes.map((v: any) => (
                                 <tr key={v.id}>
-                                  <td><code className="text-[11px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">{v.id?.substring(0, 8)}…</code></td>
+                                  <td><code className="text-[11px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md">{v.id?.substring(0, 8)}…</code></td>
                                   <td><span className="font-mono font-extrabold text-slate-800">{v.numeroPlaca || '—'}</span></td>
                                   <td><span className={POLIZA_BADGE[v.estadoPoliza ?? ''] ?? 'badge badge-gray'}>{v.estadoPoliza}</span></td>
                                   <td><span className="font-bold text-slate-600 tabular-nums">{v.polizaIntentos ?? 0}</span></td>
-                                  <td className="text-xs text-slate-400 whitespace-nowrap font-medium">
+                                  <td className="text-xs text-slate-600 whitespace-nowrap font-medium">
                                     {v.polizaUltimoIntento ? new Date(v.polizaUltimoIntento).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                                   </td>
                                   <td className="text-xs text-red-500 max-w-xs truncate font-medium">{v.polizaError || '—'}</td>
@@ -1238,7 +1528,7 @@ export default function App() {
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <footer className="border-t border-slate-100 bg-white/80 backdrop-blur-sm">
         <div className="max-w-screen-2xl mx-auto px-5 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium">
+          <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
             <div className="w-5 h-5 rounded-lg gradient-brand flex items-center justify-center shrink-0">
               {Ic.shield('w-3 h-3 text-white')}
             </div>
@@ -1246,7 +1536,7 @@ export default function App() {
             <span className="text-slate-200">·</span>
             <span>Plataforma de Seguros Vehiculares</span>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-slate-300 font-semibold">
+          <div className="flex items-center gap-3 text-[11px] text-slate-500 font-semibold">
             <a href="/api/docs" target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-brand-500 transition-colors">
               {Ic.link()} API Docs

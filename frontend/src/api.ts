@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { installDemoInterceptor } from './demo';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -7,6 +8,8 @@ export const api = axios.create({
   timeout: 20000,
   headers: { 'Content-Type': 'application/json' },
 });
+
+installDemoInterceptor(api);
 
 /**
  * Establece el session token en memoria (axios defaults).
@@ -26,12 +29,17 @@ export function clearSession() {
 
 /** Solo para el primer login — envía la API key UNA vez al endpoint de sesión. */
 function buildLoginClient() {
-  return axios.create({
+  const c = axios.create({
     baseURL: BASE_URL,
     timeout: 10000,
     headers: { 'Content-Type': 'application/json' },
   });
+  installDemoInterceptor(c);
+  return c;
 }
+
+const adminClient = axios.create({ baseURL: BASE_URL, timeout: 15000 });
+installDemoInterceptor(adminClient);
 
 export const authApi = {
   /**
@@ -137,15 +145,15 @@ export const viajeApi = {
 
 export const adminApi = {
   crear: (data: { nombre: string; webhookUrl?: string; webhookSecret?: string }, adminKey: string) =>
-    axios.post(`${BASE_URL}/admin/tenants`, data, {
+    adminClient.post('/admin/tenants', data, {
       headers: { 'X-Admin-Key': adminKey },
     }),
   listar: (adminKey: string) =>
-    axios.get(`${BASE_URL}/admin/tenants`, {
+    adminClient.get('/admin/tenants', {
       headers: { 'X-Admin-Key': adminKey },
     }),
   polizasCriticasAdmin: (adminKey: string) =>
-    axios.get(`${BASE_URL}/admin/tenants/polizas-criticas`, {
+    adminClient.get('/admin/tenants/polizas-criticas', {
       headers: { 'X-Admin-Key': adminKey },
     }),
 };
