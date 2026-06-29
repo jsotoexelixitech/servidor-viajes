@@ -139,9 +139,9 @@ export const CAMPOS_SEGURO: CampoSeguro[] = [
   // Vehículo
   { key: 'placa',               label: 'Placa',               descripcion: 'Placa del vehículo',                  ejemplo: 'AE886C23',       requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
   { key: 'fano',                label: 'Año',                 descripcion: 'Año de fabricación',                  ejemplo: '2020',           requerido: true,  tipo: 'numero', grupo: 'vehiculo' },
-  { key: 'cmarca',              label: 'Código Marca',        descripcion: 'Código de marca del vehículo',        ejemplo: '083',            requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
-  { key: 'cmodelo',             label: 'Código Modelo',       descripcion: 'Código de modelo del vehículo',       ejemplo: '001',            requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
-  { key: 'cversion',            label: 'Código Versión',      descripcion: 'Código de versión del vehículo',      ejemplo: '03',             requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
+  { key: 'cmarca',              label: 'Código Marca',        descripcion: 'Código de marca del vehículo (catálogo INMA)',  ejemplo: '074',  requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
+  { key: 'cmodelo',             label: 'Código Modelo',       descripcion: 'Código de modelo del vehículo (catálogo INMA)', ejemplo: '005',  requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
+  { key: 'cversion',            label: 'Código Versión',      descripcion: 'Código de versión del vehículo (catálogo INMA)',ejemplo: '05',   requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
   { key: 'color',               label: 'Color',               descripcion: 'Color del vehículo',                  ejemplo: 'Negro',          requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
   { key: 'serial_carroceria',   label: 'Serial Carrocería',   descripcion: 'Serial de carrocería (VIN)',          ejemplo: 'SC1S6ZMV...',    requerido: true,  tipo: 'texto',  grupo: 'vehiculo' },
   { key: 'serial_motor',        label: 'Serial Motor',        descripcion: 'Serial del motor (opcional)',         ejemplo: '',               requerido: false, tipo: 'texto',  grupo: 'vehiculo' },
@@ -228,6 +228,28 @@ export const tenantApi = {
   misPolizasCriticas: () => api.get('/viaje/mis-polizas-criticas'),
 };
 
+// ── Catálogo INMA & Cotización ─────────────────────────────────────────────
+
+export interface CatalogoMarca    { cmarca: string; xmarca: string; }
+export interface CatalogoModelo   { cmodelo: string; xmodelo: string; }
+export interface CatalogoVersion  { cversion: string; xversion: string; }
+export interface CotizacionResult { mprima: string; mprimaext: string; ptasa: number; }
+
+export const seguroCatalogoApi = {
+  anios: () =>
+    api.get<{ min: number; max: number }>('/seguro/catalogo/anios'),
+  marcas: (fano: number) =>
+    api.get<CatalogoMarca[]>(`/seguro/catalogo/marcas?fano=${fano}`),
+  modelos: (fano: number, cmarca: string) =>
+    api.get<CatalogoModelo[]>(`/seguro/catalogo/modelos?fano=${fano}&cmarca=${cmarca}`),
+  versiones: (fano: number, cmarca: string, cmodelo: string) =>
+    api.get<CatalogoVersion[]>(`/seguro/catalogo/versiones?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}`),
+  cotizar: (params: {
+    cmarca: string; cmodelo: string; cversion: string;
+    fano: number; cplan: string; ccategoria_uso: number;
+  }) => api.post<CotizacionResult>('/seguro/cotizar', params),
+};
+
 export const conductorApi = {
   listar:   (soloActivos = false) =>
     api.get<Conductor[]>(`/conductores?soloActivos=${soloActivos}`),
@@ -238,23 +260,29 @@ export const conductorApi = {
   eliminar: (id: string) => api.delete(`/conductores/${id}`),
 };
 
+export type RangoTemporal = 'hoy' | '7d' | '30d' | 'mes' | 'todo';
+const rq = (rango?: RangoTemporal) => (rango && rango !== 'todo' ? `&rango=${rango}` : '');
+const rqFirst = (rango?: RangoTemporal) => (rango && rango !== 'todo' ? `?rango=${rango}` : '');
+
 export const dashboardApi = {
-  kpis: () => api.get<DashboardKpis>('/dashboard/kpis'),
-  ranking: (metrica: 'viajes' | 'prima' | 'comision' = 'prima', limit = 10) =>
-    api.get<RankingConductor[]>(`/dashboard/conductores/ranking?metrica=${metrica}&limit=${limit}`),
-  enCurso: () => api.get<RankingConductor[]>('/dashboard/conductores/en-curso'),
-  global: (adminKey: string) =>
-    adminClient.get<KpisGlobales>('/dashboard/admin/global', {
+  kpis: (rango?: RangoTemporal) =>
+    api.get<DashboardKpis>(`/dashboard/kpis${rqFirst(rango)}`),
+  ranking: (metrica: 'viajes' | 'prima' | 'comision' = 'prima', limit = 10, rango?: RangoTemporal) =>
+    api.get<RankingConductor[]>(`/dashboard/conductores/ranking?metrica=${metrica}&limit=${limit}${rq(rango)}`),
+  enCurso: (rango?: RangoTemporal) =>
+    api.get<RankingConductor[]>(`/dashboard/conductores/en-curso${rqFirst(rango)}`),
+  global: (adminKey: string, rango?: RangoTemporal) =>
+    adminClient.get<KpisGlobales>(`/dashboard/admin/global${rqFirst(rango)}`, {
       headers: { 'X-Admin-Key': adminKey },
     }),
-  cartera: (adminKey: string) =>
-    adminClient.get<CarteraCliente[]>('/dashboard/admin/cartera', {
+  cartera: (adminKey: string, rango?: RangoTemporal) =>
+    adminClient.get<CarteraCliente[]>(`/dashboard/admin/cartera${rqFirst(rango)}`, {
       headers: { 'X-Admin-Key': adminKey },
     }),
 
   // ── Drill-down: dashboard de un tenant específico (admin) ─────────────────
-  kpisDeTenant: (adminKey: string, tenantId: string) =>
-    adminClient.get<DashboardKpis>(`/dashboard/admin/tenants/${tenantId}/kpis`, {
+  kpisDeTenant: (adminKey: string, tenantId: string, rango?: RangoTemporal) =>
+    adminClient.get<DashboardKpis>(`/dashboard/admin/tenants/${tenantId}/kpis${rqFirst(rango)}`, {
       headers: { 'X-Admin-Key': adminKey },
     }),
   rankingDeTenant: (
@@ -262,14 +290,15 @@ export const dashboardApi = {
     tenantId: string,
     metrica: 'viajes' | 'prima' | 'comision' = 'prima',
     limit = 10,
+    rango?: RangoTemporal,
   ) =>
     adminClient.get<RankingConductor[]>(
-      `/dashboard/admin/tenants/${tenantId}/conductores/ranking?metrica=${metrica}&limit=${limit}`,
+      `/dashboard/admin/tenants/${tenantId}/conductores/ranking?metrica=${metrica}&limit=${limit}${rq(rango)}`,
       { headers: { 'X-Admin-Key': adminKey } },
     ),
-  enCursoDeTenant: (adminKey: string, tenantId: string) =>
+  enCursoDeTenant: (adminKey: string, tenantId: string, rango?: RangoTemporal) =>
     adminClient.get<RankingConductor[]>(
-      `/dashboard/admin/tenants/${tenantId}/conductores/en-curso`,
+      `/dashboard/admin/tenants/${tenantId}/conductores/en-curso${rqFirst(rango)}`,
       { headers: { 'X-Admin-Key': adminKey } },
     ),
 };

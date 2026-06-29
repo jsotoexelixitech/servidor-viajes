@@ -26,7 +26,7 @@
 @layer base {
   * { @apply antialiased box-border; }
   html { scroll-behavior: smooth; font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; }
-  body { @apply bg-[#f4f6fb] text-slate-900 font-sans; }
+  body { @apply bg-[#f4f6fb] text-slate-900 font-sans; font-variant-numeric: tabular-nums; }
 
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -198,6 +198,35 @@
   .skeleton {
     @apply rounded-lg bg-slate-200/70 animate-pulse;
   }
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg, rgba(226,232,240,0.55) 0%, rgba(241,245,249,0.85) 50%, rgba(226,232,240,0.55) 100%);
+    background-size: 200% 100%;
+    animation: shimmerSlide 1.4s linear infinite;
+    border-radius: 0.5rem;
+  }
+  @keyframes shimmerSlide {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+
+  /* ── Nav (mejorado) ────────────────────────────────────────────────────── */
+  .nav-item { position: relative; }
+  .nav-active::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.6));
+    box-shadow: 0 0 6px rgba(255,255,255,.5);
+  }
+  .nav-group-label {
+    @apply text-[9.5px] font-extrabold text-slate-500 uppercase tracking-[0.14em] px-3 mb-1.5 mt-3;
+  }
 
   /* ── Section number badge ────────────────────────────────────────────────── */
   .section-num {
@@ -289,3 +318,29 @@
   font-weight: 800;
   letter-spacing: -0.02em;
 }
+
+/* ─── Activity Feed entry animation ───────────────────────────────────────── */
+@keyframes feedSlideIn {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.feed-enter { animation: feedSlideIn 0.28s ease both; }
+
+/* ─── Heatmap cell hover ──────────────────────────────────────────────────── */
+.heatmap-cell {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  cursor: default;
+}
+.heatmap-cell:hover { transform: scale(1.35); z-index: 10; position: relative; }
+
+/* ─── Presentation / Fullscreen Mode ─────────────────────────────────────── */
+body.presentation-mode aside              { display: none !important; }
+body.presentation-mode footer             { display: none !important; }
+body.presentation-mode .help-hint         { display: none !important; }
+body.presentation-mode main               { margin-left: 0 !important; max-width: 100vw !important; }
+body.presentation-mode .nav-group-label   { display: none !important; }
+body.presentation-mode { font-size: 1.05rem; }
+body.presentation-mode .stat-value        { font-size: 1.75rem !important; }
+
+/* Donut SVG transition */
+.donut-arc { transition: stroke-dasharray 0.55s cubic-bezier(0.4,0,0.2,1); }

@@ -137,56 +137,104 @@ function seedDemoData() {
 
   // ── Otros tenants (cartera de la empresa contratante, vista admin) ─────
   tenants = [
-    { id: DEMO_TENANT_ID, nombre: DEMO_TENANT_NOMBRE,           activo: true,  createdAt: dayOffset(-180) },
-    { id: 'demo-tenant-0002', nombre: 'Ridery Caracas C.A.',     activo: true,  createdAt: dayOffset(-150) },
-    { id: 'demo-tenant-0003', nombre: 'Yummy Riders Venezuela',  activo: true,  createdAt: dayOffset(-110) },
-    { id: 'demo-tenant-0004', nombre: 'Ubii Express',            activo: true,  createdAt: dayOffset(-75) },
-    { id: 'demo-tenant-0005', nombre: 'Pidedirecto Logística',   activo: false, createdAt: dayOffset(-40) },
+    { id: DEMO_TENANT_ID,     nombre: DEMO_TENANT_NOMBRE,             activo: true,  createdAt: dayOffset(-220) },
+    { id: 'demo-tenant-0002', nombre: 'TaxiAndo Caracas C.A.',         activo: true,  createdAt: dayOffset(-180) },
+    { id: 'demo-tenant-0003', nombre: 'Yummy Riders Venezuela',         activo: true,  createdAt: dayOffset(-150) },
+    { id: 'demo-tenant-0004', nombre: 'Ubii Express',                   activo: true,  createdAt: dayOffset(-130) },
+    { id: 'demo-tenant-0005', nombre: 'Pidedirecto Logística',          activo: false, createdAt: dayOffset(-110) },
+    { id: 'demo-tenant-0006', nombre: 'MoviGo Maracaibo',               activo: true,  createdAt: dayOffset(-95) },
+    { id: 'demo-tenant-0007', nombre: 'Transvalle Express',             activo: true,  createdAt: dayOffset(-80) },
+    { id: 'demo-tenant-0008', nombre: 'EcoTaxi Caribe',                 activo: true,  createdAt: dayOffset(-65) },
+    { id: 'demo-tenant-0009', nombre: 'Andinos Cargo & Pasajeros',      activo: true,  createdAt: dayOffset(-50) },
+    { id: 'demo-tenant-0010', nombre: 'Llanos Express Mototaxi',        activo: false, createdAt: dayOffset(-40) },
+    { id: 'demo-tenant-0011', nombre: 'CityRide Valencia',              activo: true,  createdAt: dayOffset(-25) },
+    { id: 'demo-tenant-0012', nombre: 'Margarita Tours & Transport',    activo: true,  createdAt: dayOffset(-12) },
   ];
 
-  // ── Histórico de viajes con conductor, prima y comisión ────────────────
-  // Cada conductor ejecuta el viaje y se le asigna la comisión de la póliza emitida.
-  // Distribuyo los viajes entre los conductores para mostrar ranking realista.
-  // Nota: el "conductor" del payload (nombreConductor) es el mismo que el del registro.
+  // ── Histórico de viajes ─────────────────────────────────────────────────
+  // Generador automático: distribuye viajes en los últimos 90 días
+  // entre los 6 conductores con pesos diferentes (top performers vs. menos activos).
+  // Esto hace que los filtros temporales (Hoy/7d/30d/Mes/Todo) muestren números
+  // distintos y realistas en lugar de los mismos siempre.
   const c = conductores;
-  viajes = [
-    // Daniel Castro — top performer (4 viajes históricos + 1 activo)
-    crearViajeDemo({ placa:'AB123CD', modelo:'Toyota Corolla',  anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0030', cnrecibo:'REC-DEMO-0030', conductor:c[0], plan:'RCVBAS', prima:485,    offset:-1000*60*60*24*7 }),
-    crearViajeDemo({ placa:'EF456GH', modelo:'Chevrolet Aveo',  anio:'2018', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0031', cnrecibo:'REC-DEMO-0031', conductor:c[0], plan:'RUSPAT', prima:1240,   offset:-1000*60*60*24*5 }),
-    crearViajeDemo({ placa:'IJ789KL', modelo:'Ford Fiesta',     anio:'2019', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0032', cnrecibo:'REC-DEMO-0032', conductor:c[0], plan:'RCVBAS', prima:512,    offset:-1000*60*60*24*4 }),
-    crearViajeDemo({ placa:'X1Y2Z3',  modelo:'Toyota Hilux',    anio:'2022', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0040', cnrecibo:'REC-DEMO-0040', conductor:c[0], plan:'RUSPAT', prima:1890,   offset:-1000*60*60*24*3 }),
-    // Andrea Vargas
-    crearViajeDemo({ placa:'MN012OP', modelo:'Hyundai Accent',  anio:'2021', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0033', cnrecibo:'REC-DEMO-0033', conductor:c[1], plan:'RCVBAS', prima:495,    offset:-1000*60*60*24*4 }),
-    crearViajeDemo({ placa:'PT112FG', modelo:'Renault Sandero', anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0041', cnrecibo:'REC-DEMO-0041', conductor:c[1], plan:'RCVBAS', prima:485,    offset:-1000*60*60*24*2 }),
-    crearViajeDemo({ placa:'QR345ST', modelo:'Renault Logan',   anio:'2022', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0034', cnrecibo:'REC-DEMO-0034', conductor:c[1], plan:'RUSPAT', prima:1380,   offset:-1000*60*60*24 }),
-    // Miguel Torres
-    crearViajeDemo({ placa:'UV678WX', modelo:'Nissan Sentra',   anio:'2020', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0035', cnrecibo:'REC-DEMO-0035', conductor:c[2], plan:'RCVBAS', prima:498,    offset:-1000*60*60*18 }),
-    crearViajeDemo({ placa:'YZ901AB', modelo:'Kia Picanto',     anio:'2019', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0036', cnrecibo:'REC-DEMO-0036', conductor:c[2], plan:'RCVBAS', prima:475,    offset:-1000*60*60*12 }),
-    // Valeria Sánchez
-    crearViajeDemo({ placa:'JK556LM', modelo:'Chery QQ',        anio:'2018', estado:'FINALIZADA', estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0042', cnrecibo:'REC-DEMO-0042', conductor:c[3], plan:'RCVBAS', prima:445,    offset:-1000*60*60*8 }),
-    // Eduardo Romero — viaje activo
-    crearViajeDemo({ placa:'CD234EF', modelo:'Toyota Yaris',    anio:'2021', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0037', cnrecibo:'REC-DEMO-0037', conductor:c[4], plan:'RCVBAS', prima:495,    offset:-1000*60*8 }),
-    // Luis Hernández — viaje activo
-    crearViajeDemo({ placa:'BR997TY', modelo:'Toyota Camry',    anio:'2023', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0043', cnrecibo:'REC-DEMO-0043', conductor:c[5], plan:'RUSPAT', prima:1690,   offset:-1000*60*15 }),
-    // Daniel Castro — viaje activo (otro)
-    crearViajeDemo({ placa:'TR332BV', modelo:'Nissan Versa',    anio:'2022', estado:'EN_CURSO',   estadoPoliza:'ACTIVA', cnpoliza:'POL-DEMO-0044', cnrecibo:'REC-DEMO-0044', conductor:c[0], plan:'RCVBAS', prima:485,    offset:-1000*60*5 }),
-    // Un viaje con error de póliza para que el monitor muestre actividad
-    {
-      ...crearViajeDemo({
-        placa:'GH567IK', modelo:'Suzuki Swift', anio:'2017',
-        estado:'EN_CURSO', estadoPoliza:'EMITIENDO',
-        conductor:c[2], plan:'RCVBAS', prima:0,
-        offset:-1000*60*18,
-      }),
-      cnpoliza: undefined,
-      cnrecibo: undefined,
-      urlPolizaPDF: undefined,
-      polizaError: 'Timeout al consultar API de aseguradora — se reintentará automáticamente',
-      polizaIntentos: 2,
-      webhookEnviado: false,
-      webhookIntentos: 2,
-    } as DemoViaje,
+  const pesoConductor = [0.28, 0.22, 0.18, 0.14, 0.10, 0.08];   // suma ≈ 1.0
+  const PLANES: { plan: string; prima: [number, number]; pct: number }[] = [
+    { plan: 'RCVBAS', prima: [470, 530], pct: 0.72 },
+    { plan: 'RUSPAT', prima: [1180, 1950], pct: 0.28 },
   ];
+  const MODELOS = [
+    'Toyota Corolla','Hyundai Accent','Chevrolet Aveo','Renault Sandero',
+    'Ford Fiesta','Nissan Sentra','Kia Picanto','Toyota Yaris',
+    'Renault Logan','Chery QQ','Suzuki Swift','Toyota Camry','Nissan Versa',
+    'Toyota Hilux','Hyundai i10','Mitsubishi Lancer','Mazda 3',
+  ];
+  const generated: DemoViaje[] = [];
+  let cnt = 0;
+  const totalHistoricos = 220;          // amplio dataset para filtros realistas
+  for (let i = 0; i < totalHistoricos; i++) {
+    // pick conductor según peso
+    const r = Math.random();
+    let acc = 0, idx = 0;
+    for (let k = 0; k < pesoConductor.length; k++) { acc += pesoConductor[k]; if (r <= acc) { idx = k; break; } }
+    const cd = c[idx];
+    // pick plan
+    const plan = Math.random() < PLANES[0].pct ? PLANES[0] : PLANES[1];
+    const prima = Math.round(plan.prima[0] + Math.random() * (plan.prima[1] - plan.prima[0]));
+    // distribución temporal: más densa en los últimos 30 días, decreciendo hacia 90
+    const u = Math.pow(Math.random(), 1.6);                 // sesgo hacia 0
+    const offsetDias = -Math.round(u * 90);                 // entre 0 y -90
+    const horaOffset = -Math.floor(Math.random() * 24);
+    const offsetMs = offsetDias * 86400000 + horaOffset * 3600000;
+    cnt += 1;
+    const placa = letrasPlaca() + String(100 + Math.floor(Math.random() * 899)) + letrasPlaca(2);
+    generated.push(crearViajeDemo({
+      placa,
+      modelo: MODELOS[Math.floor(Math.random() * MODELOS.length)],
+      anio: String(2017 + Math.floor(Math.random() * 7)),
+      estado: 'FINALIZADA',
+      estadoPoliza: 'ACTIVA',
+      cnpoliza: `POL-DEMO-${String(cnt).padStart(4, '0')}`,
+      cnrecibo: `REC-DEMO-${String(cnt).padStart(4, '0')}`,
+      conductor: cd, plan: plan.plan, prima,
+      offset: offsetMs,
+    }));
+  }
+
+  // ── Viajes activos (en curso ahora mismo) ──────────────────────────────
+  const activos: DemoViaje[] = [
+    crearViajeDemo({ placa:'CD234EF', modelo:'Toyota Yaris',  anio:'2021', estado:'EN_CURSO', estadoPoliza:'ACTIVA',
+      cnpoliza:'POL-DEMO-0500', cnrecibo:'REC-DEMO-0500', conductor:c[4], plan:'RCVBAS', prima:495, offset:-1000*60*8 }),
+    crearViajeDemo({ placa:'BR997TY', modelo:'Toyota Camry',  anio:'2023', estado:'EN_CURSO', estadoPoliza:'ACTIVA',
+      cnpoliza:'POL-DEMO-0501', cnrecibo:'REC-DEMO-0501', conductor:c[5], plan:'RUSPAT', prima:1690, offset:-1000*60*15 }),
+    crearViajeDemo({ placa:'TR332BV', modelo:'Nissan Versa',  anio:'2022', estado:'EN_CURSO', estadoPoliza:'ACTIVA',
+      cnpoliza:'POL-DEMO-0502', cnrecibo:'REC-DEMO-0502', conductor:c[0], plan:'RCVBAS', prima:485, offset:-1000*60*5 }),
+    crearViajeDemo({ placa:'WA118PL', modelo:'Hyundai Accent',anio:'2020', estado:'EN_CURSO', estadoPoliza:'ACTIVA',
+      cnpoliza:'POL-DEMO-0503', cnrecibo:'REC-DEMO-0503', conductor:c[2], plan:'RCVBAS', prima:498, offset:-1000*60*22 }),
+  ];
+  cnt += activos.length;
+  polizaCounter = cnt;
+
+  // Un viaje con error para que el Monitor muestre actividad
+  const viajeConError: DemoViaje = {
+    ...crearViajeDemo({
+      placa:'GH567IK', modelo:'Suzuki Swift', anio:'2017',
+      estado:'EN_CURSO', estadoPoliza:'EMITIENDO',
+      conductor:c[2], plan:'RCVBAS', prima:0,
+      offset:-1000*60*18,
+    }),
+    cnpoliza: undefined, cnrecibo: undefined, urlPolizaPDF: undefined,
+    polizaError: 'Timeout al consultar API de aseguradora — se reintentará automáticamente',
+    polizaIntentos: 2, webhookEnviado: false, webhookIntentos: 2,
+  };
+
+  viajes = [...activos, viajeConError, ...generated];
+}
+
+function letrasPlaca(n = 2): string {
+  const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let out = '';
+  for (let i = 0; i < n; i++) out += L[Math.floor(Math.random() * L.length)];
+  return out;
 }
 
 function dayOffset(days: number): string {
@@ -239,6 +287,65 @@ function crearViajeDemo(p: {
     primaExt: prima > 0 ? Math.round((prima / 36.5) * 100) / 100 : 0,
     comision,
   };
+}
+
+// ─── Acceso público al dataset demo ─────────────────────────────────────────
+export type DemoViajeRaw = {
+  id: string; creadoEn: string; estado: string; estadoPoliza?: string;
+  nombreConductor: string; planPoliza?: string; prima?: number;
+  comision?: number; cnpoliza?: string; cnrecibo?: string; numeroPlaca: string;
+  polizaError?: string;
+};
+
+/**
+ * Expone el dataset de viajes demo para componentes de visualización
+ * (heatmap, feed, donut). Devuelve array vacío cuando el modo demo está inactivo.
+ */
+export function getDemoViajes(rango?: string): DemoViajeRaw[] {
+  if (!isDemoMode()) return [];
+  if (viajes.length === 0) seedDemoData();
+  if (!rango || rango === 'todo') return [...viajes];
+  const desde = rangoDesde(rango);
+  if (!desde) return [...viajes];
+  return viajes.filter(v => new Date(v.creadoEn).getTime() >= desde);
+}
+
+// ─── Filtrado temporal ──────────────────────────────────────────────────────
+type Rango = 'hoy' | '7d' | '30d' | 'mes' | 'todo';
+function rangoDesde(rango?: string | null): number {
+  if (!rango || rango === 'todo') return 0;
+  const now = Date.now();
+  if (rango === 'hoy') {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();
+  }
+  if (rango === '7d') return now - 7 * 86400000;
+  if (rango === '30d') return now - 30 * 86400000;
+  if (rango === 'mes') {
+    const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.getTime();
+  }
+  return 0;
+}
+function filtrarPorRango(list: DemoViaje[], rango?: string | null): DemoViaje[] {
+  const desde = rangoDesde(rango);
+  if (desde === 0) return list;
+  return list.filter(v => new Date(v.creadoEn).getTime() >= desde);
+}
+function getQueryParam(path: string, key: string): string | null {
+  const q = path.split('?')[1];
+  if (!q) return null;
+  return new URLSearchParams(q).get(key);
+}
+/** Factor [0..1] del rango respecto a "todo" — para escalar tenants simulados. */
+function factorRango(rango?: string | null): number {
+  if (!rango || rango === 'todo') return 1;
+  if (rango === 'hoy') return 0.04;
+  if (rango === '7d')  return 0.18;
+  if (rango === '30d') return 0.55;
+  if (rango === 'mes') {
+    const d = new Date();
+    const dd = d.getDate(); return Math.max(0.05, dd / 30);
+  }
+  return 1;
 }
 
 // ─── Helpers de agregación (usados en mocks de dashboard) ────────────────────
@@ -301,19 +408,23 @@ function calcularRanking(list: DemoViaje[], metrica: 'viajes' | 'prima' | 'comis
  * usa los datos reales del demo; para los demás genera valores consistentes
  * a partir de una semilla.
  */
-function kpisSimuladosTenant(tenantId: string) {
-  if (tenantId === DEMO_TENANT_ID) return calcularKpis(viajes);
+function kpisSimuladosTenant(tenantId: string, rango?: string | null) {
+  if (tenantId === DEMO_TENANT_ID) return calcularKpis(filtrarPorRango(viajes, rango));
+  const f = factorRango(rango);
   const semilla = parseInt(tenantId.replace(/\D/g, '').slice(-2) || '5', 10);
-  const totalViajes      = Math.floor(40 + semilla * 7.5);
-  const viajesActivos    = Math.max(1, Math.floor(totalViajes * 0.06));
-  const viajesFinalizados= totalViajes - viajesActivos;
-  const polizasActivas   = Math.floor(totalViajes * 0.92);
-  const recibos          = polizasActivas;
-  const ticketBase       = 520 + semilla * 12;
-  const primaTotal       = Math.round(totalViajes * ticketBase);
-  const comisionTotal    = Math.round(primaTotal * 0.115);
-  const primaTotalExt    = Math.round((primaTotal / 36.5) * 100) / 100;
-  const ticketPromedio   = primaTotal / Math.max(totalViajes, 1);
+  const totalViajesBase   = Math.floor(40 + semilla * 7.5);
+  const totalViajes       = Math.max(0, Math.round(totalViajesBase * f));
+  const viajesActivos     = rango === 'hoy' || rango === '7d'
+    ? Math.max(0, Math.floor(totalViajes * 0.10))
+    : Math.max(1, Math.floor(totalViajes * 0.04));
+  const viajesFinalizados = Math.max(0, totalViajes - viajesActivos);
+  const polizasActivas    = Math.floor(totalViajes * 0.92);
+  const recibos           = polizasActivas;
+  const ticketBase        = 520 + semilla * 12;
+  const primaTotal        = Math.round(totalViajes * ticketBase);
+  const comisionTotal     = Math.round(primaTotal * 0.115);
+  const primaTotalExt     = Math.round((primaTotal / 36.5) * 100) / 100;
+  const ticketPromedio    = primaTotal / Math.max(totalViajes, 1);
   return {
     totalViajes, viajesActivos, viajesFinalizados,
     polizasActivas, recibos,
@@ -328,10 +439,10 @@ const NOMBRES_FAKE = [
   ['Valentina', 'Ruiz'],
 ];
 
-function rankingSimuladoTenant(tenantId: string, metrica: 'viajes' | 'prima' | 'comision') {
-  if (tenantId === DEMO_TENANT_ID) return calcularRanking(viajes, metrica);
+function rankingSimuladoTenant(tenantId: string, metrica: 'viajes' | 'prima' | 'comision', rango?: string | null) {
+  if (tenantId === DEMO_TENANT_ID) return calcularRanking(filtrarPorRango(viajes, rango), metrica);
   const semilla = parseInt(tenantId.replace(/\D/g, '').slice(-2) || '5', 10);
-  const k = kpisSimuladosTenant(tenantId);
+  const k = kpisSimuladosTenant(tenantId, rango);
   const cantidad = Math.min(6, NOMBRES_FAKE.length);
   const rows = NOMBRES_FAKE.slice(0, cantidad).map((n, i) => {
     const peso = (cantidad - i) / ((cantidad * (cantidad + 1)) / 2);
@@ -352,12 +463,12 @@ function rankingSimuladoTenant(tenantId: string, metrica: 'viajes' | 'prima' | '
   return rows.sort((a, b) => (b[key] as number) - (a[key] as number));
 }
 
-function enCursoSimuladoTenant(tenantId: string) {
+function enCursoSimuladoTenant(tenantId: string, rango?: string | null) {
   if (tenantId === DEMO_TENANT_ID) {
     const activos = viajes.filter(v => v.estado === 'EN_CURSO' || v.estado === 'INICIADO');
     return calcularRanking(activos, 'viajes');
   }
-  const k = kpisSimuladosTenant(tenantId);
+  const k = kpisSimuladosTenant(tenantId, rango);
   if (k.viajesActivos === 0) return [];
   const semilla = parseInt(tenantId.replace(/\D/g, '').slice(-2) || '5', 10);
   return NOMBRES_FAKE.slice(0, Math.min(k.viajesActivos, 4)).map((n, i) => ({
@@ -587,34 +698,50 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
   }
 
   // ── Dashboard del tenant ──────────────────────────────────────────────────
-  if (method === 'get' && path === 'dashboard/kpis') {
-    return calcularKpis(viajes);
+  if (method === 'get' && path.startsWith('dashboard/kpis')) {
+    const rango = getQueryParam(path, 'rango');
+    return calcularKpis(filtrarPorRango(viajes, rango));
   }
 
   if (method === 'get' && path.startsWith('dashboard/conductores/ranking')) {
     const params = new URLSearchParams(path.split('?')[1] ?? '');
     const metrica = (params.get('metrica') as 'viajes' | 'prima' | 'comision') ?? 'prima';
     const limit = parseInt(params.get('limit') ?? '10', 10);
-    return calcularRanking(viajes, metrica).slice(0, limit);
+    const rango = params.get('rango');
+    return calcularRanking(filtrarPorRango(viajes, rango), metrica).slice(0, limit);
   }
 
-  if (method === 'get' && path === 'dashboard/conductores/en-curso') {
+  if (method === 'get' && path.startsWith('dashboard/conductores/en-curso')) {
     const activos = viajes.filter(v => v.estado === 'EN_CURSO' || v.estado === 'INICIADO');
     return calcularRanking(activos, 'viajes');
   }
 
-  if (method === 'get' && path === 'dashboard/admin/global') {
-    const k = calcularKpis(viajes);
+  if (method === 'get' && path.startsWith('dashboard/admin/global')) {
+    const rango = getQueryParam(path, 'rango');
+    const k = calcularKpis(filtrarPorRango(viajes, rango));
+    // Para los demás tenants, sumamos sus KPIs simulados (escalados por rango).
+    const kOtros = tenants.filter(t => t.id !== DEMO_TENANT_ID).map(t => kpisSimuladosTenant(t.id, rango));
+    const sum = (sel: (x: typeof k) => number) =>
+      kOtros.reduce((a, x) => a + sel(x), 0);
     return {
-      ...k,
+      totalViajes:       k.totalViajes        + sum(x => x.totalViajes),
+      viajesActivos:     k.viajesActivos      + sum(x => x.viajesActivos),
+      viajesFinalizados: k.viajesFinalizados  + sum(x => x.viajesFinalizados),
+      polizasActivas:    k.polizasActivas     + sum(x => x.polizasActivas),
+      recibos:           k.recibos            + sum(x => x.recibos),
+      primaTotal:        Math.round((k.primaTotal     + sum(x => x.primaTotal))      * 100) / 100,
+      primaTotalExt:     Math.round((k.primaTotalExt  + sum(x => x.primaTotalExt))   * 100) / 100,
+      comisionTotal:     Math.round((k.comisionTotal  + sum(x => x.comisionTotal))   * 100) / 100,
+      ticketPromedio:    k.ticketPromedio,
       totalTenants: tenants.filter(t => t.activo).length,
       totalConductores: conductores.filter(c => c.estado === 'ACTIVO').length,
     };
   }
 
-  if (method === 'get' && path === 'dashboard/admin/cartera') {
+  if (method === 'get' && path.startsWith('dashboard/admin/cartera')) {
+    const rango = getQueryParam(path, 'rango');
     return tenants.map(t => {
-      const k = kpisSimuladosTenant(t.id);
+      const k = kpisSimuladosTenant(t.id, rango);
       return {
         id: t.id, nombre: t.nombre, activo: t.activo, creadoEn: t.createdAt,
         totalViajes: k.totalViajes, viajesActivos: k.viajesActivos,
@@ -624,20 +751,80 @@ async function handleMock(method: Method, url: string, body: unknown): Promise<u
   }
 
   // ── Drill-down: KPIs/ranking/en-curso por tenantId (admin) ────────────────
-  const drillKpis = path.match(/^dashboard\/admin\/tenants\/([^/]+)\/kpis$/);
+  const drillKpis = path.match(/^dashboard\/admin\/tenants\/([^/]+)\/kpis/);
   if (method === 'get' && drillKpis) {
-    return kpisSimuladosTenant(drillKpis[1]);
+    const rango = getQueryParam(path, 'rango');
+    return kpisSimuladosTenant(drillKpis[1], rango);
   }
   const drillRanking = path.match(/^dashboard\/admin\/tenants\/([^/]+)\/conductores\/ranking/);
   if (method === 'get' && drillRanking) {
     const params = new URLSearchParams(path.split('?')[1] ?? '');
     const metrica = (params.get('metrica') as 'viajes' | 'prima' | 'comision') ?? 'prima';
     const limit = parseInt(params.get('limit') ?? '10', 10);
-    return rankingSimuladoTenant(drillRanking[1], metrica).slice(0, limit);
+    const rango = params.get('rango');
+    return rankingSimuladoTenant(drillRanking[1], metrica, rango).slice(0, limit);
   }
-  const drillEnCurso = path.match(/^dashboard\/admin\/tenants\/([^/]+)\/conductores\/en-curso$/);
+  const drillEnCurso = path.match(/^dashboard\/admin\/tenants\/([^/]+)\/conductores\/en-curso/);
   if (method === 'get' && drillEnCurso) {
-    return enCursoSimuladoTenant(drillEnCurso[1]);
+    const rango = getQueryParam(path, 'rango');
+    return enCursoSimuladoTenant(drillEnCurso[1], rango);
+  }
+
+  // ── Catálogo INMA & Cotización ────────────────────────────────────────────
+  if (method === 'get' && path.startsWith('seguro/catalogo/anios')) {
+    return { min: 2000, max: new Date().getFullYear() + 1 };
+  }
+
+  if (method === 'get' && path.startsWith('seguro/catalogo/marcas')) {
+    return [
+      { cmarca: '013', xmarca: 'CHEVROLET' },
+      { cmarca: '026', xmarca: 'FORD' },
+      { cmarca: '056', xmarca: 'NISSAN' },
+      { cmarca: '074', xmarca: 'TOYOTA' },
+      { cmarca: '082', xmarca: 'BAJAJ' },
+      { cmarca: '083', xmarca: 'DEMO-BRAND' },
+    ];
+  }
+
+  if (method === 'get' && path.startsWith('seguro/catalogo/modelos')) {
+    const p = new URLSearchParams(path.split('?')[1] ?? '');
+    const cmarca = p.get('cmarca') ?? '';
+    const modelosPorMarca: Record<string, { cmodelo: string; xmodelo: string }[]> = {
+      '074': [{ cmodelo: '003', xmodelo: 'CAMRY' }, { cmodelo: '005', xmodelo: 'COROLLA' }, { cmodelo: '009', xmodelo: 'HILUX' }, { cmodelo: '027', xmodelo: 'YARIS' }],
+      '013': [{ cmodelo: '096', xmodelo: 'AVEO' }, { cmodelo: '105', xmodelo: 'SPARK' }, { cmodelo: '127', xmodelo: 'ONIX' }],
+      '026': [{ cmodelo: '010', xmodelo: 'FIESTA' }, { cmodelo: '015', xmodelo: 'FUSION' }],
+      '056': [{ cmodelo: '008', xmodelo: 'SENTRA' }, { cmodelo: '012', xmodelo: 'VERSA' }],
+    };
+    return modelosPorMarca[cmarca] ?? [{ cmodelo: '001', xmodelo: 'MODELO DEMO' }];
+  }
+
+  if (method === 'get' && path.startsWith('seguro/catalogo/versiones')) {
+    const p = new URLSearchParams(path.split('?')[1] ?? '');
+    const cmodelo = p.get('cmodelo') ?? '';
+    const versionesPorModelo: Record<string, { cversion: string; xversion: string }[]> = {
+      '005': [{ cversion: '05', xversion: 'LE - Automatico' }, { cversion: '20', xversion: 'GLi C/Cuero - Automatico' }, { cversion: '40', xversion: 'XEi - Automatico' }],
+      '027': [{ cversion: '19', xversion: 'LE HB - Automatico' }, { cversion: '30', xversion: 'E - CVT' }, { cversion: '33', xversion: 'LE - Automatico' }],
+      '096': [{ cversion: '31', xversion: 'LS - Automatico' }],
+      '105': [{ cversion: '10', xversion: 'LT - Automatico' }, { cversion: '11', xversion: 'LTZ - Automatico' }],
+    };
+    return versionesPorModelo[cmodelo] ?? [{ cversion: '01', xversion: 'VERSION DEMO' }];
+  }
+
+  if (method === 'post' && path.startsWith('seguro/cotizar')) {
+    const d = body as { cmarca?: string; cmodelo?: string; cversion?: string } ?? {};
+    // Solo retorna prima real si la combinación "existe" en el demo
+    const combosConPrima = [
+      '074-005-05', '074-005-20', '074-005-40',
+      '074-027-19', '074-027-30', '074-027-33',
+      '013-096-31', '013-105-10', '013-105-11',
+    ];
+    const key = `${d.cmarca}-${d.cmodelo}-${d.cversion}`;
+    const tienePrima = combosConPrima.includes(key);
+    return {
+      mprima:    tienePrima ? '18790.97' : '0.00',
+      mprimaext: tienePrima ? '38.65'    : '0.00',
+      ptasa:     486.1955,
+    };
   }
 
   // ── Fallback ─────────────────────────────────────────────────────────────

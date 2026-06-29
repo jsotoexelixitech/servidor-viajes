@@ -188,19 +188,68 @@
       <p>Integración API · La Mundial de Seguros · Ambiente QA</p>
     </div>
     <div>
-      <div class="badge-estado">⚠ PENDIENTE CORRECCIÓN SERVIDOR</div>
+      <div class="badge-estado" style="background:#d4edda;color:#155724;border-color:#28a745;">✅ RESUELTO — EMITE OK</div>
     </div>
   </div>
 
   <!-- META -->
   <div class="meta-grid">
     <div class="row"><span class="lbl">Fecha del informe</span><span class="val">27 de abril de 2026</span></div>
+    <div class="row"><span class="lbl">Última verificación</span><span class="val">28 de abril de 2026 — emisiones RCVBAS exitosas</span></div>
     <div class="row"><span class="lbl">Ambiente</span><span class="val">QA — qaapisys2000.lamundialdeseguros.com</span></div>
     <div class="row"><span class="lbl">Remitente</span><span class="val">ExelixiTech · soporte@exelixitech.com</span></div>
     <div class="row"><span class="lbl">Autenticación</span><span class="val">Header: <code>apikey</code> (token provisto por La Mundial)</span></div>
     <div class="row"><span class="lbl">Producto probado</span><span class="val">RCV Básico (RCVBAS) — Ramo 18</span></div>
     <div class="row"><span class="lbl">Endpoints evaluados</span><span class="val">/api/v1 (QA normal) · /CorreccionCalculo (nuevo)</span></div>
   </div>
+
+  <!-- ACTUALIZACIÓN: RESUELTO -->
+  <h2 style="color:#155724;border-left-color:#28a745;">0. Actualización — 28 de abril de 2026 · RESUELTO</h2>
+  <div class="alert alert-success">
+    <strong>El equipo técnico de La Mundial corrigió el Stored Procedure de RCVBAS en el servidor
+    <code>CorreccionCalculo</code>.</strong> ExelixiTech re-ejecutó las pruebas el 28/04/2026 y la emisión
+    ahora funciona correctamente. Se generaron dos pólizas RCVBAS consecutivas con números reales:
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Placa de prueba</th><th>HTTP</th><th>cnpoliza</th><th>cnrecibo</th><th>URL Póliza</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><code>EX281334</code></td>
+        <td><span class="ok">200</span></td>
+        <td><code>18-1-0000048126</code></td>
+        <td><code>18-100143231</code></td>
+        <td><a href="https://qaapi.lamundialdeseguros.com/sis2000_qa/poliza/18-1-0000048126/2026/4/" target="_blank">ver póliza</a></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><code>EX788960</code></td>
+        <td><span class="ok">200</span></td>
+        <td><code>18-1-0000048127</code></td>
+        <td><code>18-100143232</code></td>
+        <td><a href="https://qaapi.lamundialdeseguros.com/sis2000_qa/poliza/18-1-0000048127/2026/4/" target="_blank">ver póliza</a></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Cotización RCVBAS revalidada:</strong> <code>mprima: 198,114.50 Bs</code> ·
+    <code>mprimaext: 408.29 USD</code> · <code>ptasa: 485.2251</code>.
+  </p>
+  <div class="alert alert-info">
+    <strong>Conclusión:</strong> integración RCV cliente↔La Mundial completamente operativa. La emisión
+    de pólizas vía <code>/CorreccionCalculo/api/v1/external/createEmissionAuto</code> con plan
+    <strong>RCVBAS</strong> está aprobada para pasar a producción. Los números de póliza/recibo
+    son consecutivos (48126 → 48127, 143231 → 143232), lo que confirma que el flujo SP corre estable.
+  </div>
+  <hr style="border:0;border-top:1px dashed #dee2e6;margin:28px 0;">
+  <p style="color:#6c757d;font-size:11.5px;font-style:italic;">
+    A continuación se conserva el informe original del 27/04/2026 con el detalle de las pruebas que
+    permitieron diagnosticar el problema. El estado actual de cada hallazgo está descrito en la sección 0.
+  </p>
 
   <!-- RESUMEN EJECUTIVO -->
   <h2>1. Resumen Ejecutivo</h2>
@@ -588,7 +637,7 @@
   <div class="footer">
     <div>
       <strong>ExelixiTech</strong> · soporte@exelixitech.com<br>
-      Informe generado el 27 de abril de 2026
+      Informe generado el 27 de abril de 2026 · <strong>Re-validado el 28 de abril de 2026 — RESUELTO</strong>
     </div>
     <div style="text-align:right;">
       Integración RCV · La Mundial de Seguros<br>
