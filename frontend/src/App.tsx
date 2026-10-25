@@ -20,6 +20,7 @@ import type { NavItem } from './components/layout/AppSidebar';
 import { DashboardPanel } from './views/DashboardPanel';
 import { CarteraPanel } from './views/CarteraPanel';
 import { ConductoresPanel } from './views/ConductoresPanel';
+import { FlotaPanel } from './views/FlotaPanel';
 import { SetupPanel } from './views/SetupPanel';
 import { MapeoPanel } from './views/MapeoPanel';
 import { ViajePanel } from './views/ViajePanel';
@@ -32,6 +33,7 @@ const NAV: NavItem[] = [
   { id: 'dashboard',   label: 'Dashboard',     icon: () => Ic.grid(),   section: 'Análisis' },
   { id: 'cartera',     label: 'Cartera',       icon: () => Ic.shield(), section: 'Análisis' },
   { id: 'conductores', label: 'Conductores',   icon: () => Ic.users(),  section: 'Análisis',  requiresKey: true },
+  { id: 'flota',       label: 'Flota por uso', icon: () => Ic.car(),    section: 'Análisis',  requiresKey: true },
 
   { id: 'setup',       label: 'Nuevo Cliente', icon: () => Ic.plus(),   section: 'Operación' },
   { id: 'mapeo',       label: 'Configuración', icon: () => Ic.gear(),   section: 'Operación', requiresKey: true },
@@ -424,6 +426,16 @@ export default function App() {
 
           {tab === 'cartera' && (
             <CarteraPanel adminKey={adminKeyInput} setAdminKey={setAdminKeyInput} demoOn={demoOn} />
+          )}
+
+          {tab === 'flota' && apiKeySet && (
+            <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} />
+          )}
+          {tab === 'flota' && !apiKeySet && (
+            <div className="card p-10 text-center">
+              <p className="text-sm font-bold text-slate-700 mb-2">Conecta tu API Key</p>
+              <p className="text-xs text-slate-600">Flota por uso requiere conectarse con la API key del cliente (ej. Ridery).</p>
+            </div>
           )}
 
           {tab === 'conductores' && apiKeySet && (

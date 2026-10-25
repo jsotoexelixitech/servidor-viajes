@@ -12,8 +12,11 @@ export function createTypeOrmConfig(configService: ConfigService): TypeOrmModule
     username: configService.get('database.username'),
     password: configService.get('database.password'),
     database: configService.get('database.name'),
+    // DB_SCHEMA: esquema propio dentro de una BD compartida (ej. 'flota' en exelixi_nexus) para no mezclar tablas.
+    schema: process.env.DB_SCHEMA || undefined,
     entities: [Viaje, Tenant, Vehiculo],
-    synchronize: configService.get('app.nodeEnv') !== 'production',
+    // DB_SYNCHRONIZE=true crea/actualiza tablas también en producción (servidores 120/121 sin migraciones).
+    synchronize: process.env.DB_SYNCHRONIZE === 'true' || configService.get('app.nodeEnv') !== 'production',
     migrationsRun: configService.get('app.nodeEnv') === 'production',
     migrations: [__dirname + '/../migrations/*{.ts,.js}'],
     logging: configService.get('app.nodeEnv') === 'development' ? ['error', 'warn'] : ['error'],

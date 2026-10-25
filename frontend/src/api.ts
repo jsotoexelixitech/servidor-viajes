@@ -302,3 +302,102 @@ export const dashboardApi = {
       { headers: { 'X-Admin-Key': adminKey } },
     ),
 };
+
+// ─── Flota por uso (Ridery): viajes, cobro por tiempo/km y cierre mensual ────
+export type ModalidadCobro = 'TIEMPO' | 'KM';
+export type ModoCierre = 'MANUAL' | 'AUTO';
+
+export interface FlotaConfig {
+  id?: string;
+  cnpoliza: string;
+  cplan: string | null;
+  modalidad: ModalidadCobro;
+  tarifa: string | number;
+  moneda: string;
+  minimoPorViaje: string | number;
+  redondearUnidad: boolean;
+  modoCierre: ModoCierre;
+  diaCierre: number;
+  creadoPor?: string | null;
+  creadoEn?: string;
+}
+
+export interface FlotaViaje {
+  id: string;
+  idExterno: string;
+  placa: string;
+  conductorDoc: string | null;
+  conductorNombre: string | null;
+  estado: 'INICIADO' | 'FINALIZADO' | 'CANCELADO';
+  inicio: string;
+  fin: string | null;
+  km: string | null;
+  minutos: string | null;
+  costo: string | null;
+  moneda: string | null;
+  simulado: boolean;
+  origen: { direccion?: string } | null;
+  destino: { direccion?: string } | null;
+}
+
+export interface FlotaConductorResumen {
+  conductorDoc: string | null;
+  conductorNombre: string;
+  placas: string[];
+  viajes: number;
+  km: number;
+  minutos: number;
+  costo: number;
+  participacion: number;
+}
+
+export interface FlotaResumen {
+  periodo: string;
+  desde: string;
+  hasta: string;
+  cnpoliza: string;
+  moneda: string;
+  totalViajes: number;
+  totalKm: number;
+  totalMinutos: number;
+  totalMonto: number;
+  enCurso: number;
+  conductores: FlotaConductorResumen[];
+}
+
+export interface FlotaCierre {
+  id: string;
+  cnpoliza: string;
+  periodo: string;
+  desde: string;
+  hasta: string;
+  totalViajes: number;
+  totalKm: string;
+  totalMinutos: string;
+  monto: string;
+  moneda: string;
+  estado: 'BORRADOR' | 'RECIBO_GENERADO' | 'RECIBO_SIMULADO' | 'ERROR';
+  cnrecibo: string | null;
+  respuesta: Record<string, unknown> | null;
+  error: string | null;
+  generadoEn: string | null;
+}
+
+export const flotaApi = {
+  config: () => api.get<FlotaConfig>('/flota/config'),
+  historialConfig: () => api.get<FlotaConfig[]>('/flota/config/historial'),
+  guardarConfig: (data: Omit<FlotaConfig, 'id' | 'creadoPor' | 'creadoEn'>) =>
+    api.put<FlotaConfig>('/flota/config', data),
+  feed: (limit = 50, estado?: string) =>
+    api.get<FlotaViaje[]>(`/flota/viajes?limit=${limit}${estado ? `&estado=${estado}` : ''}`),
+  resumen: (periodo: string) => api.get<FlotaResumen>(`/flota/resumen?periodo=${periodo}`),
+  simular: (data: { cantidad?: number; periodo?: string; conductores?: number; enCurso?: number }) =>
+    api.post<{ periodo: string; finalizados: number; enCurso: number; conductores: number }>('/flota/simular', data),
+  borrarSimulados: () => api.delete<{ borrados: number }>('/flota/simulados'),
+  cierres: () => api.get<FlotaCierre[]>('/flota/cierres'),
+  calcularCierre: (periodo: string) => api.post<FlotaCierre>('/flota/cierres', { periodo }),
+  detalleCierre: (id: string) =>
+    api.get<{ cierre: FlotaCierre; resumen: FlotaResumen }>(`/flota/cierres/${id}`),
+  generarRecibo: (id: string, modo: 'SIMULADO' | 'REAL' = 'SIMULADO') =>
+    api.post<FlotaCierre>(`/flota/cierres/${id}/recibo`, { modo }),
+};
