@@ -126,7 +126,11 @@ export default function App() {
 
   // ── Notifications ──────────────────────────────────────────────────────────
   const pushNotif = useCallback((tipo: Notif['tipo'], titulo: string, mensaje: string) => {
-    const notif: Notif = { id: crypto.randomUUID(), tipo, titulo, mensaje, ts: new Date() };
+    // crypto.randomUUID solo existe en contextos seguros (https/localhost); por http://IP:puerto no está.
+    const id = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const notif: Notif = { id, tipo, titulo, mensaje, ts: new Date() };
     setNotifs(prev => [notif, ...prev].slice(0, 50));
     if (tipo === 'success')      toast.success(mensaje, { duration: 3000 });
     else if (tipo === 'error')   toast.error(mensaje,   { duration: 6000 });
