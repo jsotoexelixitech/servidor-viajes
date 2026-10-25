@@ -20,6 +20,7 @@ import { SeguroModule } from './modules/seguro/seguro.module';
 import { VehiculoModule } from './modules/vehiculo/vehiculo.module';
 import { ConductorModule } from './modules/conductor/conductor.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { FlotaModule } from './modules/flota/flota.module';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -121,6 +122,7 @@ import { EnvValidatorService } from './common/env-validator.service';
     VehiculoModule,
     ConductorModule,
     DashboardModule,
+    FlotaModule,
   ],
   providers: [
     // Rate limiting global

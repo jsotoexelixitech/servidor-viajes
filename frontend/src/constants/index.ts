@@ -24,5 +24,5 @@ export const GRUPO_META = {
 
 // ─── Navigation (requires icons — defined in App.tsx alongside Ic) ───────────
 export const NAV_REQUIRES_KEY = new Set<Tab>([
-  'mapeo', 'viaje', 'finalizar', 'listar', 'monitor', 'conductores',
+  'mapeo', 'viaje', 'finalizar', 'listar', 'monitor', 'conductores', 'flota',
 ]);
