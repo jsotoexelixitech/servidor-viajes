@@ -220,6 +220,30 @@ export class FlotaService {
       }))
       .sort((a, b) => b.costo - a.costo);
 
+    // Datos para la pantalla: cancelados del mes, cobro por día y avance del mes (proyección en el front).
+    const cancelados = await this.viajeRepo.createQueryBuilder('v')
+      .where('v.tenant_id = :tenantId', { tenantId })
+      .andWhere('v.estado = :estado', { estado: EstadoViajeFlota.CANCELADO })
+      .andWhere('v.inicio >= :desde AND v.inicio < :hasta', { desde: desdeD, hasta: hastaD })
+      .getCount();
+    const porDiaMap = new Map<string, { dia: string; viajes: number; monto: number; km: number; minutos: number }>();
+    for (const v of finalizados) {
+      const dia = new Date(v.fin as unknown as string).toISOString().slice(0, 10);
+      const d = porDiaMap.get(dia) ?? { dia, viajes: 0, monto: 0, km: 0, minutos: 0 };
+      d.viajes += 1; d.monto += num(v.costo); d.km += num(v.km); d.minutos += num(v.minutos);
+      porDiaMap.set(dia, d);
+    }
+    const porDia = [...porDiaMap.values()]
+      .sort((a, b) => a.dia.localeCompare(b.dia))
+      .map((d) => ({ ...d, monto: r2(d.monto), km: r2(d.km), minutos: r2(d.minutos) }));
+    const desdeMs = new Date(desdeD).getTime();
+    const hastaMs = new Date(hastaD).getTime();
+    const ahoraMs = Date.now();
+    const diasMes = Math.round((hastaMs - desdeMs) / 86400000);
+    const diasTranscurridos = ahoraMs < desdeMs ? 0
+      : ahoraMs >= hastaMs ? diasMes
+      : Math.min(diasMes, Math.floor((ahoraMs - desdeMs) / 86400000) + 1);
+
     const cfg = await this.getConfig(tenantId);
     return {
       periodo, desde, hasta,
@@ -230,6 +254,12 @@ export class FlotaService {
       totalMinutos: r2(finalizados.reduce((a, v) => a + num(v.minutos), 0)),
       totalMonto: r2(total),
       enCurso,
+      cancelados,
+      conductoresActivos: conductores.length,
+      promedioViaje: finalizados.length ? r2(total / finalizados.length) : 0,
+      diasMes,
+      diasTranscurridos,
+      porDia,
       conductores,
     };
   }

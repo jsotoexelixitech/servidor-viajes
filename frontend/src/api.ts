@@ -362,6 +362,12 @@ export interface FlotaResumen {
   totalMinutos: number;
   totalMonto: number;
   enCurso: number;
+  cancelados?: number;
+  conductoresActivos?: number;
+  promedioViaje?: number;
+  diasMes?: number;
+  diasTranscurridos?: number;
+  porDia?: { dia: string; viajes: number; monto: number; km: number; minutos: number }[];
   conductores: FlotaConductorResumen[];
 }
 

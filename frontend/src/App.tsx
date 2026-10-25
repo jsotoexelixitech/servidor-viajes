@@ -20,7 +20,7 @@ import type { NavItem } from './components/layout/AppSidebar';
 import { DashboardPanel } from './views/DashboardPanel';
 import { CarteraPanel } from './views/CarteraPanel';
 import { ConductoresPanel } from './views/ConductoresPanel';
-import { FlotaPanel } from './views/FlotaPanel';
+import { FlotaPanel, FlotaEmbedConnect } from './views/FlotaPanel';
 import { SetupPanel } from './views/SetupPanel';
 import { MapeoPanel } from './views/MapeoPanel';
 import { ViajePanel } from './views/ViajePanel';
@@ -30,10 +30,10 @@ import { MonitorPanel } from './views/MonitorPanel';
 
 // ─── Nav definition (uses Ic so must be here) ────────────────────────────────
 const NAV: NavItem[] = [
+  { id: 'flota',       label: 'Flota por uso', icon: () => Ic.car(),    section: 'Análisis',  requiresKey: true },
   { id: 'dashboard',   label: 'Dashboard',     icon: () => Ic.grid(),   section: 'Análisis' },
   { id: 'cartera',     label: 'Cartera',       icon: () => Ic.shield(), section: 'Análisis' },
   { id: 'conductores', label: 'Conductores',   icon: () => Ic.users(),  section: 'Análisis',  requiresKey: true },
-  { id: 'flota',       label: 'Flota por uso', icon: () => Ic.car(),    section: 'Análisis',  requiresKey: true },
 
   { id: 'setup',       label: 'Nuevo Cliente', icon: () => Ic.plus(),   section: 'Operación' },
   { id: 'mapeo',       label: 'Configuración', icon: () => Ic.gear(),   section: 'Operación', requiresKey: true },
@@ -43,6 +43,12 @@ const NAV: NavItem[] = [
   { id: 'listar',      label: 'Viajes',        icon: () => Ic.rows(),   section: 'Histórico', requiresKey: true },
   { id: 'monitor',     label: 'Monitor',       icon: () => Ic.pulse(),  section: 'Histórico', requiresKey: true, dot: true },
 ];
+
+// ─── Modo embebido (iframe dentro del sistema de La Mundial) ──────────────────
+// ?embed=1 muestra solo Flota por uso, sin menú ni cabecera. La API key llega por
+// ?apiKey= (se borra de la URL tras usarla) o por postMessage({ type: 'flota:apiKey', apiKey }).
+const QS    = new URLSearchParams(window.location.search);
+const EMBED = QS.get('embed') === '1';
 
 // ─── Error translation helper ─────────────────────────────────────────────────
 function friendlyError(e: unknown): { titulo: string; mensaje: string } {
@@ -67,7 +73,7 @@ function friendlyError(e: unknown): { titulo: string; mensaje: string } {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab]             = useState<Tab>('dashboard');
+  const [tab, setTab]             = useState<Tab>(EMBED ? 'flota' : 'dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [demoOn, setDemoOn]       = useState(isDemoMode());
 
@@ -129,15 +135,15 @@ export default function App() {
   }, []);
 
   // ── Auth handlers ──────────────────────────────────────────────────────────
-  const handleSetApiKey = async () => {
-    const key = apiKeyInput.trim();
-    if (!key) return;
+  const loginWithKey = useCallback(async (key: string) => {
     setApiKeyLoading(true); setApiKeyError('');
     try {
       const res = await authApi.login(key);
       setSessionToken(res.data.sessionToken);
       setApiKeySet(true); setApiKeyInput('');
       setTenantNombreConectado(res.data.tenant.nombre);
+      // Flota por uso es la pantalla principal al conectar.
+      setTab(t => (t === 'dashboard' ? 'flota' : t));
       pushNotif('success', 'Conectado', `Sesión iniciada como "${res.data.tenant.nombre}"`);
     } catch (e: unknown) {
       clearSession(); setApiKeySet(false); setTenantNombreConectado('');
@@ -147,7 +153,30 @@ export default function App() {
     } finally {
       setApiKeyLoading(false);
     }
+  }, [pushNotif]);
+
+  const handleSetApiKey = () => {
+    const key = apiKeyInput.trim();
+    if (key) void loginWithKey(key);
   };
+
+  // Modo embebido: clave por ?apiKey= (se quita de la URL) o por postMessage desde la página que abre el iframe.
+  useEffect(() => {
+    if (!EMBED) return;
+    const k = QS.get('apiKey');
+    if (k) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('apiKey');
+      window.history.replaceState({}, '', url.toString());
+      void loginWithKey(k);
+    }
+    const onMsg = (ev: MessageEvent) => {
+      const d = ev.data as { type?: string; apiKey?: string } | null;
+      if (d && d.type === 'flota:apiKey' && d.apiKey) void loginWithKey(d.apiKey);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [loginWithKey]);
 
   const toggleDemo = useCallback(async () => {
     const next = !demoOn;
@@ -321,14 +350,29 @@ export default function App() {
   }, []);
 
   // ══════════════════════════════════════════════════════════════════════════
+  const toaster = (
+    <Toaster position="top-right" toastOptions={{
+      style: { fontSize: '12px', fontWeight: 600, borderRadius: '10px', maxWidth: '360px' },
+      success: { style: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' } },
+      error:   { style: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' } },
+    }} />
+  );
+
+  if (EMBED) {
+    return (
+      <div className="min-h-screen bg-[#f4f6fb] p-3 sm:p-5">
+        {toaster}
+        {apiKeySet
+          ? <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} embed />
+          : <FlotaEmbedConnect loading={apiKeyLoading} error={apiKeyError} onConnect={(k) => void loginWithKey(k)} />}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#f4f6fb]">
       <WelcomeSplash />
-      <Toaster position="top-right" toastOptions={{
-        style: { fontSize: '12px', fontWeight: 600, borderRadius: '10px', maxWidth: '360px' },
-        success: { style: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' } },
-        error:   { style: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' } },
-      }} />
+      {toaster}
 
       {polizaPreview && <PolizaModal viaje={polizaPreview} onClose={() => setPolizaPreview(null)} />}
 
@@ -429,12 +473,13 @@ export default function App() {
           )}
 
           {tab === 'flota' && apiKeySet && (
-            <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} />
+            <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} />
           )}
           {tab === 'flota' && !apiKeySet && (
-            <div className="card p-10 text-center">
-              <p className="text-sm font-bold text-slate-700 mb-2">Conecta tu API Key</p>
-              <p className="text-xs text-slate-600">Flota por uso requiere conectarse con la API key del cliente (ej. Ridery).</p>
+            <div className="card p-10 text-center animate-in">
+              <div className="w-12 h-12 rounded-2xl gradient-brand text-white flex items-center justify-center mx-auto mb-3">{Ic.car('w-5 h-5')}</div>
+              <p className="text-sm font-extrabold text-slate-800 mb-1">Conecta la API Key de la flota</p>
+              <p className="text-xs text-slate-600 max-w-sm mx-auto">Flota por uso muestra los viajes y el cobro del mes de la plataforma conectada (ej. Ridery). Pega su API Key arriba y pulsa Conectar.</p>
             </div>
           )}
 
