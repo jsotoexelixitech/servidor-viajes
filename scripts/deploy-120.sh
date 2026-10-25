@@ -109,7 +109,7 @@ fi
 # ── 2. Backend ─────────────────────────────────────────────────────────────
 echo "▶ Backend: npm ci + build"
 cd "$ROOT/backend"
-npm ci --legacy-peer-deps --no-audit --no-fund --loglevel=error
+npm ci --include=dev --legacy-peer-deps --no-audit --no-fund --loglevel=error
 npm run build
 
 # Esquema propio en la BD compartida (idempotente).
@@ -129,7 +129,7 @@ fi
 echo "▶ Frontend: npm ci + build"
 cd "$ROOT/frontend"
 unset VITE_API_URL
-npm ci --legacy-peer-deps --no-audit --no-fund --loglevel=error
+npm ci --include=dev --legacy-peer-deps --no-audit --no-fund --loglevel=error
 npm run build
 
 # ── 4. PM2 (un proceso: API + pantalla) ────────────────────────────────────
