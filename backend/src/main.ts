@@ -106,9 +106,10 @@ async function bootstrap() {
 // En producción lanza 1 worker por CPU y reinicia automáticamente caídas.
 //
 // Para forzar N workers en cualquier ambiente:  CLUSTER_WORKERS=4 npm run start:dev
+// CLUSTER_WORKERS=1 fuerza un solo proceso (servidores compartidos, ej. el 120).
 const requestedWorkers = parseInt(process.env.CLUSTER_WORKERS ?? '0', 10);
 const isProduction     = process.env.NODE_ENV === 'production';
-const numWorkers       = requestedWorkers > 1 ? requestedWorkers
+const numWorkers       = requestedWorkers > 0 ? requestedWorkers
                        : isProduction          ? os.cpus().length
                        : 1;
 

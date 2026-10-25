@@ -78,6 +78,7 @@ if [ ! -f "$ENVF" ]; then
   cat > "$ENVF" <<EOF
 NODE_ENV=production
 PORT=$PORT
+CLUSTER_WORKERS=1
 APP_PREFIX=api
 CORS_ORIGINS=http://192.168.8.120:$PORT,http://localhost:$PORT
 SESSION_SECRET=$(openssl rand -hex 32)
@@ -105,6 +106,9 @@ NEST_API_KEY=
 EOF
   echo "  .env creado (permisos 600). ADMIN_SECRET para 'Nuevo Cliente': grep ADMIN_SECRET backend/.env"
 fi
+
+# Servidor compartido: un solo proceso, sin cluster (también en .env creados antes de este ajuste).
+grep -q '^CLUSTER_WORKERS=' "$ENVF" || echo 'CLUSTER_WORKERS=1' >> "$ENVF"
 
 # ── 2. Backend ─────────────────────────────────────────────────────────────
 echo "▶ Backend: npm ci + build"
@@ -136,14 +140,23 @@ npm run build
 echo "▶ PM2"
 cd "$ROOT/backend"
 set -a; . ./.env; set +a
-if pm2 describe "$APP" > /dev/null 2>&1; then
-  pm2 restart "$APP" --update-env
-else
-  pm2 start dist/main.js --name "$APP" --time
-fi
+# Se recrea para aplicar el tope de reinicios: si algo falla no queda en bucle consumiendo CPU.
+pm2 delete "$APP" > /dev/null 2>&1 || true
+pkill -f "$ROOT/backend/dist/main.js" > /dev/null 2>&1 || true
+pm2 start dist/main.js --name "$APP" --time --max-restarts 5 --exp-backoff-restart-delay 2000
 pm2 save > /dev/null
 
-sleep 6
-echo "▶ Salud: http://127.0.0.1:$PORT/api/health"
-curl -s -o /dev/null -w "  HTTP %{http_code}\n" "http://127.0.0.1:$PORT/api/health" || true
+echo "▶ Salud: http://127.0.0.1:$PORT/api/health (espera hasta 40 s)"
+CODE=000
+for i in $(seq 1 20); do
+  sleep 2
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/health" || true)
+  [ "$CODE" = "000" ] || break
+done
+echo "  HTTP $CODE"
+if [ "$CODE" = "000" ]; then
+  pm2 stop "$APP" > /dev/null; pm2 save > /dev/null
+  echo "  ✖ No responde; lo detuve para no consumir CPU. Ver: pm2 logs $APP --lines 60 --nostream"
+  exit 1
+fi
 echo "✔ Abrir: http://192.168.8.120:$PORT/"
