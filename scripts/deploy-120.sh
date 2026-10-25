@@ -29,17 +29,29 @@ if [ ! -f "$ENVF" ]; then
   DB_HOST=${HOSTPORT%%:*}; DB_PORT=${HOSTPORT##*:}
   [ "$DB_PORT" = "$HOSTPORT" ] && DB_PORT=5432
 
+  # Candidatas: redis.conf (si es legible) y los .env* de los otros proyectos (REDIS_PASSWORD/PASS/AUTH o REDIS_URL
+  # con clave). Se usa la primera que responda PONG; nunca se imprime.
+  buscar_redis_pass() {
+    {
+      [ -r /etc/redis/redis.conf ] && grep -E '^[[:space:]]*requirepass[[:space:]]+' /etc/redis/redis.conf | awk '{print $2}'
+      find "$HOME" -maxdepth 4 -name node_modules -prune -o -type f -name '.env*' -print 2>/dev/null | while read -r f; do
+        grep -hE '^(REDIS_PASSWORD|REDIS_PASS|REDIS_AUTH)=.+' "$f" | cut -d= -f2-
+        grep -hoE '^REDIS_URL=rediss?://[^@]*@' "$f" | sed -E 's#^REDIS_URL=rediss?://[^:]*:##; s#@$##'
+      done
+    } 2>/dev/null | tr -d "\"'\r" | awk 'NF' | sort -u | while read -r c; do
+      if redis-cli -a "$c" --no-auth-warning ping 2>/dev/null | grep -q PONG; then echo "$c"; break; fi
+    done
+  }
   if [ -z "${REDIS_PASS:-}" ]; then
-    REDIS_PASS=$(grep -h -E '^REDIS_PASSWORD=.+' "$HOME"/*/.env "$HOME"/exelixi/*/.env \
-      "$HOME"/exelixi/*/server/.env "$HOME"/exelixi/*/backend/.env 2>/dev/null \
-      | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    REDIS_PASS=$(buscar_redis_pass || true)
+    [ -n "$REDIS_PASS" ] && echo "  Clave de Redis encontrada y verificada (PONG)."
   fi
   if [ -z "${REDIS_PASS:-}" ]; then
     echo "✖ No encontré la clave de Redis. Ejecuta: REDIS_PASS='la_clave' bash scripts/deploy-120.sh"
     exit 1
   fi
   if ! redis-cli -a "$REDIS_PASS" --no-auth-warning ping | grep -q PONG; then
-    echo "✖ La clave de Redis encontrada no funciona. Ejecuta: REDIS_PASS='la_clave' bash scripts/deploy-120.sh"
+    echo "✖ La clave de Redis no funciona. Ejecuta: REDIS_PASS='la_clave' bash scripts/deploy-120.sh"
     exit 1
   fi
 
