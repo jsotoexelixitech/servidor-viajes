@@ -30,7 +30,22 @@ async function bootstrap() {
   const corsOrigins = configService.get<string[]>('app.corsOrigins');
 
   // ── Seguridad ──────────────────────────────────────────────────────────────
-  app.use(helmet({ crossOriginEmbedderPolicy: false, contentSecurityPolicy: nodeEnv === 'production' }));
+  // PUBLIC_HTTPS=true solo cuando se publique detrás de una URL con certificado. Por IP:puerto (http) no se
+  // fuerza https: upgrade-insecure-requests, HSTS y COOP dejan la pantalla en blanco o se ignoran con avisos.
+  const publicHttps = process.env.PUBLIC_HTTPS === 'true';
+  app.use(helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: publicHttps,
+    originAgentCluster: publicHttps,
+    hsts: publicHttps,
+    contentSecurityPolicy: nodeEnv === 'production' && {
+      directives: {
+        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
+        'upgrade-insecure-requests': publicHttps ? [] : null,
+      },
+    },
+  }));
   app.use(compression());
   app.enableCors({
     origin: corsOrigins,
