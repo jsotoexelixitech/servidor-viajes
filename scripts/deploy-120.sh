@@ -42,16 +42,35 @@ if [ ! -f "$ENVF" ]; then
       if redis-cli -a "$c" --no-auth-warning ping 2>/dev/null | grep -q PONG; then echo "$c"; break; fi
     done
   }
+  # Sin clave del Redis del sistema: Redis propio del usuario (127.0.0.1:6380, pm2 'redis-viajes'), sin sudo.
+  redis_propio() {
+    local dir="$HOME/.redis-viajes" conf="$HOME/.redis-viajes/redis.conf"
+    command -v redis-server > /dev/null || return 1
+    mkdir -p "$dir"; chmod 700 "$dir"
+    if [ ! -f "$conf" ]; then
+      ( umask 077; printf 'port 6380\nbind 127.0.0.1\nprotected-mode yes\nrequirepass %s\ndir %s\nappendonly yes\ndaemonize no\n' \
+        "$(openssl rand -hex 24)" "$dir" > "$conf" )
+    fi
+    pm2 describe redis-viajes > /dev/null 2>&1 || pm2 start "$(command -v redis-server)" --name redis-viajes -- "$conf" > /dev/null
+    sleep 2
+    awk '/^requirepass/{print $2}' "$conf"
+  }
+  REDIS_PORT_USE=6379
   if [ -z "${REDIS_PASS:-}" ]; then
     REDIS_PASS=$(buscar_redis_pass || true)
     [ -n "$REDIS_PASS" ] && echo "  Clave de Redis encontrada y verificada (PONG)."
   fi
   if [ -z "${REDIS_PASS:-}" ]; then
-    echo "✖ No encontré la clave de Redis. Ejecuta: REDIS_PASS='la_clave' bash scripts/deploy-120.sh"
+    echo "  Sin clave del Redis del sistema → Redis propio en 127.0.0.1:6380 (pm2 redis-viajes)"
+    REDIS_PASS=$(redis_propio || true)
+    REDIS_PORT_USE=6380
+  fi
+  if [ -z "${REDIS_PASS:-}" ]; then
+    echo "✖ No hay clave de Redis ni redis-server disponible. Ejecuta: REDIS_PASS='la_clave' bash scripts/deploy-120.sh"
     exit 1
   fi
-  if ! redis-cli -a "$REDIS_PASS" --no-auth-warning ping | grep -q PONG; then
-    echo "✖ La clave de Redis no funciona. Ejecuta: REDIS_PASS='la_clave' bash scripts/deploy-120.sh"
+  if ! redis-cli -p "$REDIS_PORT_USE" -a "$REDIS_PASS" --no-auth-warning ping | grep -q PONG; then
+    echo "✖ Redis en el puerto $REDIS_PORT_USE no responde con esa clave (ver: pm2 logs redis-viajes)."
     exit 1
   fi
 
@@ -73,7 +92,7 @@ DB_SCHEMA=flota
 DB_SYNCHRONIZE=true
 DB_POOL_SIZE=10
 REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
+REDIS_PORT=$REDIS_PORT_USE
 REDIS_PASSWORD=$REDIS_PASS
 REDIS_DB=5
 LOG_LEVEL=info
