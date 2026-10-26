@@ -46,7 +46,7 @@ export function KpiCard({
         </div>
       </div>
       <p className="text-[9.5px] font-extrabold uppercase tracking-[0.1em] opacity-85 mt-2.5">{label}</p>
-      <p className="text-xl sm:text-[1.55rem] font-extrabold leading-tight mt-0.5 tabular-nums">
+      <p className="font-display text-xl sm:text-[1.55rem] font-bold leading-tight mt-0.5 tabular-nums">
         {currency && <span className="text-[11px] opacity-70 font-semibold mr-0.5">{currency}</span>}
         {value}
       </p>

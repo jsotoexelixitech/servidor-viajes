@@ -82,7 +82,7 @@ export function FlotaPanel({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="section-title text-brand-600">{Ic.car('w-3.5 h-3.5')} Póliza de flota por uso</p>
-          <h1 className={`${embed ? 'text-xl' : 'page-title'} font-extrabold text-slate-900 tracking-tight mt-1 truncate`}>
+          <h1 className={`${embed ? 'text-xl font-display font-bold text-[#091133]' : 'page-title'} mt-1 truncate`}>
             {tenantNombre || 'Flota'}
           </h1>
           {!embed && (
@@ -125,7 +125,7 @@ export function FlotaEmbedConnect({
   return (
     <div className="max-w-md mx-auto mt-10 card p-6 space-y-4 animate-in">
       <div className="flex items-center gap-3">
-        <img src="/logo-isotipo-transparente.png" alt="La Mundial" className="w-10 h-10 object-contain" />
+        <img src="/brand/mundial-isotipo.png" alt="La Mundial" className="w-10 h-10 object-contain" />
         <div>
           <p className="text-sm font-extrabold text-slate-900">Flota por uso</p>
           <p className="text-xs text-slate-600">Conecta la API key de la plataforma para ver los viajes y el cobro del mes.</p>
@@ -137,6 +137,28 @@ export function FlotaEmbedConnect({
       <button className="btn-primary w-full" disabled={loading || !key.trim()} onClick={() => onConnect(key.trim())}>
         {loading ? <Spinner size="sm" /> : Ic.key()} Conectar
       </button>
+    </div>
+  );
+}
+
+/** Estado del acceso por SSO (Nexus): validando o error. Sin campo de API key. */
+export function SsoEstado({ loading, error }: { loading: boolean; error: string }) {
+  return (
+    <div className="max-w-md mx-auto mt-10 card p-8 text-center animate-in">
+      <img src="/brand/mundial-isotipo.png" alt="" className="w-14 h-14 mx-auto object-contain" draggable={false} />
+      {loading || !error ? (
+        <>
+          <div className="flex justify-center mt-5"><Spinner size="lg" /></div>
+          <p className="font-display text-lg font-bold text-[#091133] mt-4">Validando el acceso</p>
+          <p className="text-xs text-[#5E6275] mt-1">Confirmando la sesión con Nexus…</p>
+        </>
+      ) : (
+        <>
+          <p className="font-display text-lg font-bold text-[#091133] mt-5">No se pudo abrir la flota</p>
+          <p className="text-sm text-[#8F2A2D] bg-[#FDECEC] rounded-xl px-3 py-2 mt-3">{error}</p>
+          <p className="text-xs text-[#5E6275] mt-3">Vuelve a abrir el módulo desde Nexus. Si persiste, avisa a soporte.</p>
+        </>
+      )}
     </div>
   );
 }
@@ -175,12 +197,12 @@ function ResumenTab({ periodo, pushNotif, go }: { periodo: string; pushNotif: Pu
         <KpiCard icon={Ic.cash('w-4 h-4')} gradient="gradient-brand" loading={loading}
           label="Total a cobrar este mes" value={fmt(data.totalMonto, 2)} currency={data.moneda}
           sub={diasTrans < diasMes ? `Proyección al cierre: ${money(proyeccion, data.moneda)}` : 'Mes completo'} />
-        <KpiCard icon={Ic.car('w-4 h-4')} gradient="gradient-success" loading={loading}
+        <KpiCard icon={Ic.car('w-4 h-4')} gradient="gradient-navy-blue" loading={loading}
           label="Viajes finalizados" value={fmt(data.totalViajes)}
           sub={`${fmt(data.cancelados ?? 0)} cancelados · ${fmt(data.enCurso)} en curso ahora`} />
-        <KpiCard icon={Ic.trend('w-4 h-4')} gradient="gradient-warm" loading={loading}
+        <KpiCard icon={Ic.trend('w-4 h-4')} gradient="gradient-navy-deep" loading={loading}
           label="Km recorridos" value={fmt(data.totalKm, 1)} sub={`${dur(data.totalMinutos)} en viaje`} />
-        <KpiCard icon={Ic.users('w-4 h-4')} gradient="gradient-accent" loading={loading}
+        <KpiCard icon={Ic.users('w-4 h-4')} gradient="gradient-red" loading={loading}
           label="Costo promedio por viaje" value={fmt(promedio, 2)} currency={data.moneda}
           sub={`${fmt(data.conductoresActivos ?? data.conductores.length)} conductores con viajes`} />
       </div>

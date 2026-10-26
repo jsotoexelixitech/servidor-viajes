@@ -1,10 +1,13 @@
 import {
-  Controller, Post, Get, Put, Body, Param,
+  Controller, Post, Get, Put, Body, Param, Headers,
   ParseUUIDPipe, HttpCode, HttpStatus, UseGuards,
+  UnauthorizedException, ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
 import { TenantService } from './tenant.service';
+import { NexusSsoService } from './nexus-sso.service';
 import { CrearTenantDto } from './dto/crear-tenant.dto';
+import { NexusSsoDto } from './dto/nexus-sso.dto';
 import { ConfigurarSeguroDto } from '../seguro/dto/seguro-config.dto';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
@@ -41,7 +44,39 @@ export class AuthController {
   constructor(
     private readonly sessionService: SessionService,
     private readonly tenantService: TenantService,
+    private readonly nexusSso: NexusSsoService,
   ) {}
+
+  @Post('nexus')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SSO desde Nexus — intercambia el nexus_token (tenant_access) por un session token',
+    description: 'Nexus abre el módulo con ?nexus_token=. El front lo envía aquí una vez y usa el sessionToken en adelante. No requiere API key.',
+  })
+  @ApiResponse({ status: 200, description: 'Sesión iniciada para la flota vinculada a la empresa Nexus.' })
+  @ApiResponse({ status: 401, description: 'Token inválido o TENANT_TOKEN_SECRET distinto al de nexus-api.' })
+  async loginNexus(@Body() dto: NexusSsoDto, @Headers('authorization') auth?: string) {
+    const token = (dto?.nexus_token || auth?.replace(/^Bearer\s+/i, '') || '').trim();
+    if (!token) throw new UnauthorizedException('nexus_token requerido.');
+
+    const payload = this.nexusSso.verificar(token);
+    const hb = await this.nexusSso.heartbeat(token);
+    if (!hb.active) throw new ForbiddenException(hb.reason || 'Acceso suspendido en Nexus.');
+    const tenant = await this.nexusSso.resolverTenant(payload.empresaId);
+
+    const { token: sessionToken, expiresAt } = this.sessionService.generate(tenant.id);
+    return {
+      sessionToken,
+      expiresAt,
+      tenant: { id: tenant.id, nombre: tenant.nombre },
+      nexus: {
+        empresaId: payload.empresaId,
+        empresaNombre: hb.empresaNombre ?? payload.empresaNombre ?? null,
+        submoduloId: payload.submoduloId,
+        metadata: payload.metadata ?? {},
+      },
+    };
+  }
 
   @Post('session')
   @UseGuards(TenantGuard)

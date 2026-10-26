@@ -110,6 +110,20 @@ fi
 # Servidor compartido: un solo proceso, sin cluster (también en .env creados antes de este ajuste).
 grep -q '^CLUSTER_WORKERS=' "$ENVF" || echo 'CLUSTER_WORKERS=1' >> "$ENVF"
 
+# SSO desde Nexus: mismo TENANT_TOKEN_SECRET que nexus-api del 120 (se copia sin mostrarlo).
+ensure_env() { grep -q "^$1=" "$ENVF" || echo "$1=$2" >> "$ENVF"; }
+if ! grep -q '^TENANT_TOKEN_SECRET=.' "$ENVF"; then
+  TTS=$(grep -h '^TENANT_TOKEN_SECRET=' "$NX_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d "\"'\r")
+  if [ -n "$TTS" ]; then
+    sed -i '/^TENANT_TOKEN_SECRET=/d' "$ENVF"; echo "TENANT_TOKEN_SECRET=$TTS" >> "$ENVF"
+    echo "  TENANT_TOKEN_SECRET copiado de nexus-api (SSO desde Nexus listo)"
+  else
+    echo "  ⚠ nexus-api sin TENANT_TOKEN_SECRET: el SSO desde Nexus no funcionará hasta ponerlo en backend/.env"
+  fi
+fi
+ensure_env NEXUS_API_URL http://127.0.0.1:3092
+ensure_env FLOTA_NEXUS_TENANT_DEFAULT Ridery
+
 # ── 2. Backend ─────────────────────────────────────────────────────────────
 echo "▶ Backend: npm ci + build"
 cd "$ROOT/backend"

@@ -52,6 +52,12 @@ export const authApi = {
       {},
       { headers: { 'X-Api-Key': apiKey } },
     ),
+  /** SSO desde Nexus: el nexus_token de la URL se cambia por un session token (sin API key). */
+  nexus: (nexusToken: string) =>
+    buildLoginClient().post<{
+      sessionToken: string; expiresAt: string; tenant: { id: string; nombre: string };
+      nexus: { empresaId: number; empresaNombre: string | null; submoduloId: number; metadata: Record<string, unknown> };
+    }>('/auth/nexus', { nexus_token: nexusToken }),
 };
 
 export interface Viaje {

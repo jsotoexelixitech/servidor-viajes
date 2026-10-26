@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="La Mundial de Seguros">
+  <defs>
+    <linearGradient id="mundial-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#162A7F"/>
+      <stop offset="100%" stop-color="#0F1A5A"/>
+    </linearGradient>
+  </defs>
+  <circle cx="88" cy="32" r="18" fill="#E84F51"/>
+  <circle cx="60" cy="60" r="54" fill="#FFFFFF"/>
+  <circle cx="60" cy="60" r="50" fill="url(#mundial-blue)" opacity="0.08"/>
+  <path fill="url(#mundial-blue)" d="M36 38h12l6 22 6-22h12L58 82H42L36 38zm24 0h12l10 28c2 6 2 10 2 16h-11c0-4 0-8-2-12l-8-22h-5z"/>
+</svg>

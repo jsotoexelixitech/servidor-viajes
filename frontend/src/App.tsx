@@ -20,7 +20,7 @@ import type { NavItem } from './components/layout/AppSidebar';
 import { DashboardPanel } from './views/DashboardPanel';
 import { CarteraPanel } from './views/CarteraPanel';
 import { ConductoresPanel } from './views/ConductoresPanel';
-import { FlotaPanel, FlotaEmbedConnect } from './views/FlotaPanel';
+import { FlotaPanel, FlotaEmbedConnect, SsoEstado } from './views/FlotaPanel';
 import { SetupPanel } from './views/SetupPanel';
 import { MapeoPanel } from './views/MapeoPanel';
 import { ViajePanel } from './views/ViajePanel';
@@ -48,7 +48,10 @@ const NAV: NavItem[] = [
 // ?embed=1 muestra solo Flota por uso, sin menú ni cabecera. La API key llega por
 // ?apiKey= (se borra de la URL tras usarla) o por postMessage({ type: 'flota:apiKey', apiKey }).
 const QS    = new URLSearchParams(window.location.search);
-const EMBED = QS.get('embed') === '1';
+const inIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
+const EMBED = QS.get('embed') === '1' || inIframe;
+/** SSO desde Nexus: ?nexus_token= en la URL (igual que los módulos). Se guarda en sessionStorage para recargas. */
+const NEXUS_TOKEN_KEY = 'flota_nexus_token';
 
 // ─── Error translation helper ─────────────────────────────────────────────────
 function friendlyError(e: unknown): { titulo: string; mensaje: string } {
@@ -84,6 +87,10 @@ export default function App() {
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
   const [apiKeyError,   setApiKeyError]   = useState('');
   const [tenantNombreConectado, setTenantNombreConectado] = useState('');
+  // SSO desde Nexus (sin API key)
+  const [ssoMode,    setSsoMode]    = useState(false);
+  const [ssoEmpresa, setSsoEmpresa] = useState('');
+  const [ssoError,   setSsoError]   = useState('');
   const [notifs,        setNotifs]        = useState<Notif[]>([]);
   const [notifOpen,     setNotifOpen]     = useState(false);
 
@@ -181,6 +188,42 @@ export default function App() {
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, [loginWithKey]);
+
+  // SSO desde Nexus: el nexus_token se cambia por un session token; no hay API key que pegar.
+  const loginWithNexus = useCallback(async (nexusToken: string) => {
+    setSsoMode(true); setSsoError(''); setApiKeyLoading(true);
+    if (isDemoMode()) { setDemoMode(false); setDemoOn(false); }
+    try {
+      const res = await authApi.nexus(nexusToken);
+      setSessionToken(res.data.sessionToken);
+      setApiKeySet(true);
+      setTenantNombreConectado(res.data.tenant.nombre);
+      setSsoEmpresa(res.data.nexus?.empresaNombre || '');
+      setTab('flota');
+    } catch (e: unknown) {
+      clearSession(); setApiKeySet(false); setTenantNombreConectado('');
+      const { titulo, mensaje } = friendlyError(e);
+      setSsoError(mensaje);
+      pushNotif('error', `Acceso Nexus: ${titulo}`, mensaje);
+    } finally {
+      setApiKeyLoading(false);
+    }
+  }, [pushNotif]);
+
+  useEffect(() => {
+    const fromUrl = QS.get('nexus_token');
+    let token = fromUrl;
+    try {
+      if (token) sessionStorage.setItem(NEXUS_TOKEN_KEY, token);
+      else token = sessionStorage.getItem(NEXUS_TOKEN_KEY);
+    } catch { /* sin storage */ }
+    if (fromUrl) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('nexus_token');
+      window.history.replaceState({}, '', url.toString());
+    }
+    if (token) void loginWithNexus(token);
+  }, [loginWithNexus]);
 
   const toggleDemo = useCallback(async () => {
     const next = !demoOn;
@@ -368,14 +411,16 @@ export default function App() {
         {toaster}
         {apiKeySet
           ? <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} embed />
-          : <FlotaEmbedConnect loading={apiKeyLoading} error={apiKeyError} onConnect={(k) => void loginWithKey(k)} />}
+          : ssoMode
+            ? <SsoEstado loading={apiKeyLoading} error={ssoError} />
+            : <FlotaEmbedConnect loading={apiKeyLoading} error={apiKeyError} onConnect={(k) => void loginWithKey(k)} />}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f4f6fb]">
-      <WelcomeSplash />
+    <div className="min-h-screen flex flex-col bg-[#F4F5F8]">
+      {!ssoMode && <WelcomeSplash />}
       {toaster}
 
       {polizaPreview && <PolizaModal viaje={polizaPreview} onClose={() => setPolizaPreview(null)} />}
@@ -391,6 +436,8 @@ export default function App() {
         apiKeyLoading={apiKeyLoading}
         apiKeyError={apiKeyError}
         tenantNombreConectado={tenantNombreConectado}
+        ssoMode={ssoMode}
+        ssoEmpresa={ssoEmpresa}
         onConnectApiKey={handleSetApiKey}
         demoOn={demoOn}
         onToggleDemo={toggleDemo}
@@ -455,6 +502,7 @@ export default function App() {
           apiKeySet={apiKeySet}
           demoOn={demoOn}
           navItems={NAV}
+          ssoMode={ssoMode}
           onNavTo={navTo}
           onOverlayClick={() => setSidebarOpen(false)}
         />
@@ -479,7 +527,8 @@ export default function App() {
           {tab === 'flota' && apiKeySet && (
             <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} />
           )}
-          {tab === 'flota' && !apiKeySet && (
+          {tab === 'flota' && !apiKeySet && ssoMode && <SsoEstado loading={apiKeyLoading} error={ssoError} />}
+          {tab === 'flota' && !apiKeySet && !ssoMode && (
             <div className="card p-10 text-center animate-in">
               <div className="w-12 h-12 rounded-2xl gradient-brand text-white flex items-center justify-center mx-auto mb-3">{Ic.car('w-5 h-5')}</div>
               <p className="text-sm font-extrabold text-slate-800 mb-1">Conecta la API Key de la flota</p>

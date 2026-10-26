@@ -32,7 +32,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Manual de Identidad La Mundial (igual que el portal de emisión)
+        sans: ['Poppins', 'system-ui', 'sans-serif'],
+        display: ['Libre Baskerville', 'Georgia', 'Times New Roman', 'serif'],
         mono: ['JetBrains Mono', 'Consolas', 'monospace'],
       },
     },

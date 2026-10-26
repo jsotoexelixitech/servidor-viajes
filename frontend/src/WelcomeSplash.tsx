@@ -102,7 +102,7 @@ export function WelcomeSplash() {
           />
 
           <img
-            src="/logo-isotipo-transparente.png"
+            src="/brand/mundial-isotipo.png"
             alt="La Mundial de Seguros"
             draggable={false}
             className="relative w-[110px] sm:w-[140px] h-auto select-none"
@@ -140,7 +140,7 @@ export function WelcomeSplash() {
             className="text-xs sm:text-sm mt-3 max-w-xs sm:max-w-sm leading-relaxed"
             style={{ animation: 'splashTextIn 0.6s ease-out 0.95s both', color: '#475569' }}
           >
-            Suscripción digital de pólizas RCV en minutos. Seguro, rápido y sin papeleo.
+            Flota por uso: viajes por conductor, cobro por tiempo o km y un solo recibo mensual.
           </p>
 
           <div
