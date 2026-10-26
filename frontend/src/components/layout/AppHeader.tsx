@@ -81,8 +81,10 @@ export function AppHeader({
           <div className="flex items-center gap-2 flex-1 min-w-0 max-w-md">
             <div className="relative flex-1 min-w-0">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#ACACAC] pointer-events-none hidden sm:block">{Ic.key('w-3.5 h-3.5')}</span>
+              {/* autoComplete/name evitan que Chrome rellene el campo con una contraseña guardada para esta IP. */}
               <input ref={inputRef} type={apiKeyVis ? 'text' : 'password'} placeholder="API Key de la plataforma…"
-                value={apiKeyInput} onChange={(e) => onApiKeyInput(e.target.value)}
+                name="flota-api-key" autoComplete="off" spellCheck={false} data-lpignore="true"
+                value={apiKeyInput} onChange={(e) => onApiKeyInput(e.target.value.replace(/\s+/g, ''))}
                 onKeyDown={(e) => e.key === 'Enter' && onConnectApiKey()}
                 className="input pl-3 sm:pl-8 pr-8 h-9 text-xs w-full" />
               <button onClick={onToggleApiKeyVis} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#ACACAC] hover:text-[#0F1A5A] transition-colors">
