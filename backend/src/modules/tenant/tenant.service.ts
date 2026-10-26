@@ -92,6 +92,16 @@ export class TenantService {
     return tenants.map(({ apiKey, ...rest }) => rest as Tenant);
   }
 
+  /** Marca propia de la flota (pantalla). Se guarda en config.ui y se devuelve al iniciar sesión. */
+  async actualizarUi(id: string, ui: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const tenant = await this.tenantRepo.findOne({ where: { id } });
+    if (!tenant) throw new NotFoundException('Tenant no encontrado');
+    tenant.config = { ...(tenant.config ?? {}), ui: { ...((tenant.config?.ui as object) ?? {}), ...ui } };
+    await this.tenantRepo.save(tenant);
+    await this.invalidarCache(tenant.apiKey);
+    return tenant.config.ui;
+  }
+
   async desactivar(id: string): Promise<void> {
     const tenant = await this.tenantRepo.findOne({ where: { id } });
     if (!tenant) throw new NotFoundException('Tenant no encontrado');

@@ -123,6 +123,8 @@ if ! grep -q '^TENANT_TOKEN_SECRET=.' "$ENVF"; then
 fi
 ensure_env NEXUS_API_URL http://127.0.0.1:3092
 ensure_env FLOTA_NEXUS_TENANT_DEFAULT Ridery
+# Pantalla para La Mundial: solo acceso desde Nexus (sin campo de API key). Marca/colores: ver .env.example (UI_*).
+ensure_env UI_AUTH_MODES nexus
 
 # ── 2. Backend ─────────────────────────────────────────────────────────────
 echo "▶ Backend: npm ci + build"

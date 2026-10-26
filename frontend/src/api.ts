@@ -47,7 +47,7 @@ export const authApi = {
    * La API key viaja en este único request y nunca se almacena.
    */
   login: (apiKey: string) =>
-    buildLoginClient().post<{ sessionToken: string; expiresAt: string; tenant: { id: string; nombre: string } }>(
+    buildLoginClient().post<{ sessionToken: string; expiresAt: string; tenant: { id: string; nombre: string }; ui?: Partial<UiConfig> | null }>(
       '/auth/session',
       {},
       { headers: { 'X-Api-Key': apiKey } },
@@ -55,9 +55,26 @@ export const authApi = {
   /** SSO desde Nexus: el nexus_token de la URL se cambia por un session token (sin API key). */
   nexus: (nexusToken: string) =>
     buildLoginClient().post<{
-      sessionToken: string; expiresAt: string; tenant: { id: string; nombre: string };
+      sessionToken: string; expiresAt: string; tenant: { id: string; nombre: string }; ui?: Partial<UiConfig> | null;
       nexus: { empresaId: number; empresaNombre: string | null; submoduloId: number; metadata: Record<string, unknown> };
     }>('/auth/nexus', { nexus_token: nexusToken }),
+};
+
+/** Marca, colores y modos de acceso de la pantalla (por despliegue; cada flota puede sobrescribir su marca). */
+export interface UiConfig {
+  brandName: string;
+  brandSuffix: string;
+  appTitle: string;
+  logoUrl: string;
+  colors: {
+    primary: string; primaryDeep: string; primaryBright: string; blue: string;
+    accent: string; accentCta: string; accentHover: string;
+  };
+  authModes: Array<'nexus' | 'apikey'>;
+}
+
+export const uiApi = {
+  get: () => axios.create({ baseURL: BASE_URL, timeout: 8000 }).get<UiConfig>('/config/ui'),
 };
 
 export interface Viaje {

@@ -7,6 +7,7 @@ import { KpiCard } from '../components/ui/KpiCard';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Ic } from '../components/ui/Icons';
+import { useBrand } from '../lib/branding';
 
 /**
  * Flota por uso (Ridery): viajes por conductor, cobro por tiempo o km y un solo recibo mensual por la póliza.
@@ -122,12 +123,13 @@ export function FlotaEmbedConnect({
   loading, error, onConnect,
 }: { loading: boolean; error: string; onConnect: (apiKey: string) => void }) {
   const [key, setKey] = useState('');
+  const brand = useBrand();
   return (
     <div className="max-w-md mx-auto mt-10 card p-6 space-y-4 animate-in">
       <div className="flex items-center gap-3">
-        <img src="/brand/mundial-isotipo.png" alt="La Mundial" className="w-10 h-10 object-contain" />
+        <img src={brand.logoUrl} alt="" className="w-10 h-10 object-contain" />
         <div>
-          <p className="text-sm font-extrabold text-slate-900">Flota por uso</p>
+          <p className="text-sm font-extrabold text-slate-900">{brand.appTitle}</p>
           <p className="text-xs text-slate-600">Conecta la API key de la plataforma para ver los viajes y el cobro del mes.</p>
         </div>
       </div>
@@ -141,12 +143,18 @@ export function FlotaEmbedConnect({
   );
 }
 
-/** Estado del acceso por SSO (Nexus): validando o error. Sin campo de API key. */
-export function SsoEstado({ loading, error }: { loading: boolean; error: string }) {
+/** Estado del acceso por SSO (Nexus): validando, error, o aviso de "abrir desde Nexus". Sin campo de API key. */
+export function SsoEstado({ loading, error, mensaje }: { loading: boolean; error: string; mensaje?: string }) {
+  const brand = useBrand();
   return (
     <div className="max-w-md mx-auto mt-10 card p-8 text-center animate-in">
-      <img src="/brand/mundial-isotipo.png" alt="" className="w-14 h-14 mx-auto object-contain" draggable={false} />
-      {loading || !error ? (
+      <img src={brand.logoUrl} alt="" className="w-14 h-14 mx-auto object-contain" draggable={false} />
+      {!loading && !error && mensaje ? (
+        <>
+          <p className="font-display text-lg font-bold text-[#091133] mt-5">{brand.appTitle}</p>
+          <p className="text-sm text-[#5E6275] mt-2">{mensaje}</p>
+        </>
+      ) : loading || !error ? (
         <>
           <div className="flex justify-center mt-5"><Spinner size="lg" /></div>
           <p className="font-display text-lg font-bold text-[#091133] mt-4">Validando el acceso</p>
@@ -323,7 +331,7 @@ function DailyBars({ periodo, dias, moneda, diasMes }: {
           return (
             <g key={d.dia}>
               <rect x={i * 22 + 4} y={base - h} width="14" height={h} rx="3"
-                fill={esHoy ? '#e84f51' : d.monto > 0 ? '#2e6dbf' : '#e2e8f0'} opacity={d.monto > 0 ? 1 : 0.6}>
+                style={{ fill: esHoy ? 'var(--lm-red)' : d.monto > 0 ? 'var(--lm-blue)' : '#e2e8f0' }} opacity={d.monto > 0 ? 1 : 0.6}>
                 <title>{`${d.dia}: ${d.viajes} viajes · ${money(d.monto, moneda)} · ${fmt(d.km, 1)} km`}</title>
               </rect>
               {(i === 0 || (i + 1) % 5 === 0) && (
@@ -334,8 +342,8 @@ function DailyBars({ periodo, dias, moneda, diasMes }: {
         })}
       </svg>
       <div className="flex items-center gap-4 text-[10.5px] text-slate-500 mt-1">
-        <span className="inline-flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm bg-[#2e6dbf] inline-block" /> Día con viajes</span>
-        <span className="inline-flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm bg-[#e84f51] inline-block" /> Hoy</span>
+        <span className="inline-flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm bg-[var(--lm-blue)] inline-block" /> Día con viajes</span>
+        <span className="inline-flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm bg-[var(--lm-red)] inline-block" /> Hoy</span>
         <span className="ml-auto">Máximo del mes: {money(max, moneda)}</span>
       </div>
     </div>

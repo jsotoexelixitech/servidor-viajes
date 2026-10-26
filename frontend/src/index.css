@@ -90,8 +90,8 @@
            transition-all duration-[150ms] active:scale-[0.97]
            disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
-  .btn-primary { @apply btn bg-[#D4403F] text-white shadow-[var(--shadow-accent)] hover:bg-[#BF3534]; }
-  .btn-navy    { @apply btn bg-[#0F1A5A] text-white shadow-[var(--shadow-brand)] hover:bg-[#162A7F]; }
+  .btn-primary { @apply btn bg-[var(--lm-red-cta)] text-white shadow-[var(--shadow-accent)] hover:bg-[var(--lm-red-hover)]; }
+  .btn-navy    { @apply btn bg-[var(--lm-navy)] text-white shadow-[var(--shadow-brand)] hover:bg-[var(--lm-navy-bright)]; }
   .btn-secondary {
     @apply btn bg-white text-[#0F1A5A] border-[#D8DAE2] shadow-[var(--shadow-xs)]
            hover:bg-[#F0F2F8] hover:border-[#ACACAC];
@@ -116,8 +116,8 @@
 
   /* ── Nav ────────────────────────────────────────────────────────────────── */
   .nav-item { @apply w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-[150ms] text-left cursor-pointer select-none; }
-  .nav-active   { @apply bg-[#0F1A5A] text-white shadow-[var(--shadow-brand)] font-semibold; }
-  .nav-inactive { @apply text-[#0F1A5A] hover:bg-white hover:shadow-[var(--shadow-xs)]; }
+  .nav-active   { @apply bg-[var(--lm-navy)] text-white shadow-[var(--shadow-brand)] font-semibold; }
+  .nav-inactive { @apply text-[var(--lm-navy)] hover:bg-white hover:shadow-[var(--shadow-xs)]; }
   .nav-disabled { @apply text-[#ACACAC] cursor-not-allowed pointer-events-none; }
   .nav-group-label { @apply text-[10px] font-semibold text-[#ACACAC] uppercase tracking-[0.18em] px-3 mb-1.5 mt-4; }
 
@@ -135,11 +135,11 @@
   .stat-label { @apply text-[11px] font-semibold text-[#5E6275] uppercase tracking-[0.08em]; }
 
   /* ── Titles ─────────────────────────────────────────────────────────────── */
-  .section-title { @apply text-[11px] font-semibold text-[#0F1A5A] uppercase tracking-[0.12em] flex items-center gap-2; }
+  .section-title { @apply text-[11px] font-semibold text-[var(--lm-navy)] uppercase tracking-[0.12em] flex items-center gap-2; }
   .page-title    { @apply text-[1.75rem] font-bold text-[#091133] leading-tight; font-family: var(--font-display); letter-spacing: -0.01em; }
   .page-subtitle { @apply text-sm text-[#5E6275] mt-1; }
 
-  .step-num { @apply shrink-0 w-7 h-7 rounded-full bg-[#0F1A5A] text-white text-xs font-bold flex items-center justify-center; }
+  .step-num { @apply shrink-0 w-7 h-7 rounded-full bg-[var(--lm-navy)] text-white text-xs font-bold flex items-center justify-center; }
 
   /* ── Table ──────────────────────────────────────────────────────────────── */
   .data-table { @apply w-full text-sm border-collapse; }
@@ -163,17 +163,17 @@
   }
   @keyframes shimmerSlide { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 
-  .section-num { @apply w-5 h-5 rounded-md bg-[#0F1A5A] text-white text-[10px] font-bold flex items-center justify-center shrink-0; }
+  .section-num { @apply w-5 h-5 rounded-md bg-[var(--lm-navy)] text-white text-[10px] font-bold flex items-center justify-center shrink-0; }
 }
 
 /* ─── Utilities ───────────────────────────────────────────────────────────── */
 @layer utilities {
   .text-balance { text-wrap: balance; }
-  .gradient-brand     { background: linear-gradient(135deg, #162A7F 0%, #0F1A5A 100%); }
-  .gradient-navy-blue { background: linear-gradient(135deg, #2E6DBF 0%, #162A7F 100%); }
-  .gradient-navy-deep { background: linear-gradient(135deg, #1C2A78 0%, #091133 100%); }
-  .gradient-red       { background: linear-gradient(135deg, #E84F51 0%, #BF3534 100%); }
-  .gradient-accent    { background: linear-gradient(135deg, #FF6675 0%, #D4403F 100%); }
+  .gradient-brand     { background: linear-gradient(135deg, var(--lm-navy-bright) 0%, var(--lm-navy) 100%); }
+  .gradient-navy-blue { background: linear-gradient(135deg, var(--lm-blue) 0%, var(--lm-navy-bright) 100%); }
+  .gradient-navy-deep { background: linear-gradient(135deg, var(--lm-navy-bright) 0%, var(--lm-navy-deep) 100%); }
+  .gradient-red       { background: linear-gradient(135deg, var(--lm-red) 0%, var(--lm-red-hover) 100%); }
+  .gradient-accent    { background: linear-gradient(135deg, var(--lm-red) 0%, var(--lm-red-cta) 100%); }
   .gradient-success   { background: linear-gradient(135deg, #34d399 0%, #059669 100%); }
   .gradient-warm      { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); }
   .ring-input { box-shadow: 0 0 0 3px rgb(46 109 191 / 0.15); }

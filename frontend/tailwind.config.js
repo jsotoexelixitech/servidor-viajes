@@ -12,8 +12,8 @@ export default {
           300: '#7aa1de',
           400: '#4a8dd5', // Azul claro logo
           500: '#2e6dbf', // Azul brillante logo
-          600: '#162a7f', // Pennsylvania claro
-          700: '#0f1a5a', // Pennsylvania principal
+          600: 'var(--lm-navy-bright)', // Pennsylvania claro (parametrizable)
+          700: 'var(--lm-navy)', // Pennsylvania principal (parametrizable)
           800: '#0b1547',
           900: '#091133', // Pennsylvania oscuro
           950: '#050a22',
@@ -24,7 +24,7 @@ export default {
           200: '#ffb1b3',
           300: '#ff8a8d',
           400: '#ff6675', // Imperial claro
-          500: '#e84f51', // Imperial principal
+          500: 'var(--lm-red)', // Imperial principal (parametrizable)
           600: '#c63a3c',
           700: '#a02a2c',
           800: '#7a1f21',

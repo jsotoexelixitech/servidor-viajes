@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Tab } from '../../types';
 import { SidebarTourCard } from '../ui/SidebarTourCard';
+import { useBrand } from '../../lib/branding';
 
 export interface NavItem {
   id: Tab;
@@ -27,6 +28,8 @@ const SECTIONS = ['Análisis', 'Operación', 'Histórico'] as const;
 export function AppSidebar({
   open, tab, apiKeySet, demoOn, navItems, onNavTo, onOverlayClick, ssoMode = false,
 }: AppSidebarProps) {
+  const brand = useBrand();
+  const conClave = !ssoMode && brand.authModes.includes('apikey');
   return (
     <>
       {open && (
@@ -46,7 +49,7 @@ export function AppSidebar({
                 const isActive = tab === item.id;
                 return (
                   <button key={item.id} onClick={() => !disabled && onNavTo(item.id)} disabled={disabled}
-                    title={disabled ? (ssoMode ? 'Esperando el acceso de Nexus' : 'Requiere conectar la flota') : item.label}
+                    title={disabled ? (conClave ? 'Requiere conectar la flota' : 'Se habilita al abrir el módulo desde Nexus') : item.label}
                     className={`nav-item ${isActive ? 'nav-active' : disabled ? 'nav-disabled' : 'nav-inactive'}`}>
                     <span className={`${isActive ? 'text-white' : disabled ? 'text-[#C9CCD6]' : 'text-[#2E6DBF]'} shrink-0`}>{item.icon()}</span>
                     <span className="flex-1 text-left">{item.label}</span>
@@ -65,14 +68,18 @@ export function AppSidebar({
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full shrink-0 ${apiKeySet ? 'bg-emerald-500' : 'bg-amber-500'}`} />
               <p className={`text-[11px] font-semibold leading-snug ${apiKeySet ? 'text-[#0F1A5A]' : 'text-[#7A4B00]'}`}>
-                {apiKeySet ? (ssoMode ? 'Sesión iniciada desde Nexus' : 'Flota conectada') : ssoMode ? 'Validando acceso…' : 'Sin flota conectada'}
+                {apiKeySet ? (ssoMode ? 'Sesión iniciada desde Nexus' : 'Flota conectada') : ssoMode ? 'Validando acceso…' : conClave ? 'Sin flota conectada' : 'Acceso desde Nexus'}
               </p>
             </div>
-            {!apiKeySet && !ssoMode && <p className="text-[10px] text-[#7A4B00] mt-1">Conecta la API key de la plataforma para activar todas las funciones.</p>}
+            {!apiKeySet && !ssoMode && (
+              <p className="text-[10px] text-[#7A4B00] mt-1">
+                {conClave ? 'Conecta la API key de la plataforma para activar todas las funciones.' : 'Abre este módulo desde Nexus para activar todas las funciones.'}
+              </p>
+            )}
           </div>
 
           <div className="mt-2 px-3 pt-2 border-t border-[#E3E5EC] flex items-center justify-between text-[9.5px] font-semibold text-[#ACACAC] uppercase tracking-[0.14em]">
-            <span>{demoOn && !ssoMode ? 'Demo' : 'La Mundial'}</span>
+            <span>{demoOn && conClave ? 'Demo' : brand.brandName}</span>
             <span className="font-mono normal-case tracking-normal">v2.2</span>
           </div>
         </div>

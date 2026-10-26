@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect, FormEvent } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import {
-  authApi, setSessionToken, clearSession, viajeApi, tenantApi, adminApi,
+  authApi, setSessionToken, clearSession, viajeApi, tenantApi, adminApi, uiApi,
   CAMPOS_SEGURO, SeguroConfig, RangoTemporal,
-  Viaje,
+  Viaje, UiConfig,
 } from './api';
+import { BRAND_DEFAULT, BrandContext, applyBranding, mergeBrand } from './lib/branding';
 import { setDemoMode, isDemoMode, DEMO_INFO, buildDemoViajeBody } from './demo';
 import { WelcomeSplash } from './WelcomeSplash';
 
@@ -87,6 +88,23 @@ export default function App() {
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
   const [apiKeyError,   setApiKeyError]   = useState('');
   const [tenantNombreConectado, setTenantNombreConectado] = useState('');
+  // Marca y modos de acceso del despliegue (GET /api/config/ui); cada flota puede sobrescribir su marca.
+  const [brand, setBrand] = useState<UiConfig>(BRAND_DEFAULT);
+  const apikeyMode = brand.authModes.includes('apikey');
+  useEffect(() => {
+    uiApi.get()
+      .then((r) => { const b = mergeBrand(BRAND_DEFAULT, r.data); setBrand(b); applyBranding(b); })
+      .catch(() => applyBranding(BRAND_DEFAULT));
+  }, []);
+  // Sin modo apikey no existe el modo demo.
+  useEffect(() => {
+    if (!apikeyMode && isDemoMode()) { setDemoMode(false); setDemoOn(false); }
+  }, [apikeyMode]);
+  const aplicarMarcaFlota = useCallback((ui?: Partial<UiConfig> | null) => {
+    if (!ui) return;
+    setBrand((prev) => { const b = mergeBrand(prev, { ...ui, authModes: undefined }); applyBranding(b); return b; });
+  }, []);
+
   // SSO desde Nexus (sin API key)
   const [ssoMode,    setSsoMode]    = useState(false);
   const [ssoEmpresa, setSsoEmpresa] = useState('');
@@ -153,6 +171,7 @@ export default function App() {
       setSessionToken(res.data.sessionToken);
       setApiKeySet(true); setApiKeyInput('');
       setTenantNombreConectado(res.data.tenant.nombre);
+      aplicarMarcaFlota(res.data.ui);
       // Flota por uso es la pantalla principal al conectar.
       setTab(t => (t === 'dashboard' ? 'flota' : t));
       pushNotif('success', 'Conectado', `Sesión iniciada como "${res.data.tenant.nombre}"`);
@@ -164,7 +183,7 @@ export default function App() {
     } finally {
       setApiKeyLoading(false);
     }
-  }, [pushNotif]);
+  }, [pushNotif, aplicarMarcaFlota]);
 
   const handleSetApiKey = () => {
     const key = apiKeyInput.trim();
@@ -199,6 +218,7 @@ export default function App() {
       setApiKeySet(true);
       setTenantNombreConectado(res.data.tenant.nombre);
       setSsoEmpresa(res.data.nexus?.empresaNombre || '');
+      aplicarMarcaFlota(res.data.ui);
       setTab('flota');
     } catch (e: unknown) {
       clearSession(); setApiKeySet(false); setTenantNombreConectado('');
@@ -208,7 +228,7 @@ export default function App() {
     } finally {
       setApiKeyLoading(false);
     }
-  }, [pushNotif]);
+  }, [pushNotif, aplicarMarcaFlota]);
 
   useEffect(() => {
     const fromUrl = QS.get('nexus_token');
@@ -407,18 +427,23 @@ export default function App() {
 
   if (EMBED) {
     return (
-      <div className="min-h-screen bg-[#f4f6fb] p-3 sm:p-5">
+      <BrandContext.Provider value={brand}>
+      <div className="min-h-screen bg-[#F4F5F8] p-3 sm:p-5">
         {toaster}
         {apiKeySet
           ? <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} embed />
           : ssoMode
             ? <SsoEstado loading={apiKeyLoading} error={ssoError} />
-            : <FlotaEmbedConnect loading={apiKeyLoading} error={apiKeyError} onConnect={(k) => void loginWithKey(k)} />}
+            : apikeyMode
+              ? <FlotaEmbedConnect loading={apiKeyLoading} error={apiKeyError} onConnect={(k) => void loginWithKey(k)} />
+              : <SsoEstado loading={false} error="" mensaje="Este módulo se abre desde Nexus; no requiere ninguna clave." />}
       </div>
+      </BrandContext.Provider>
     );
   }
 
   return (
+    <BrandContext.Provider value={brand}>
     <div className="min-h-screen flex flex-col bg-[#F4F5F8]">
       {!ssoMode && <WelcomeSplash />}
       {toaster}
@@ -528,7 +553,10 @@ export default function App() {
             <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} />
           )}
           {tab === 'flota' && !apiKeySet && ssoMode && <SsoEstado loading={apiKeyLoading} error={ssoError} />}
-          {tab === 'flota' && !apiKeySet && !ssoMode && (
+          {tab === 'flota' && !apiKeySet && !ssoMode && !apikeyMode && (
+            <SsoEstado loading={false} error="" mensaje="Este módulo se abre desde Nexus; no requiere ninguna clave. Pide a tu administrador el acceso al módulo." />
+          )}
+          {tab === 'flota' && !apiKeySet && !ssoMode && apikeyMode && (
             <div className="card p-10 text-center animate-in">
               <div className="w-12 h-12 rounded-2xl gradient-brand text-white flex items-center justify-center mx-auto mb-3">{Ic.car('w-5 h-5')}</div>
               <p className="text-sm font-extrabold text-slate-800 mb-1">Conecta la API Key de la flota</p>
@@ -633,10 +661,11 @@ export default function App() {
               {Ic.link()} API Docs
             </a>
             <span>·</span>
-            <span>v2.1 · {new Date().getFullYear()}</span>
+            <span>v2.2 · {new Date().getFullYear()}</span>
           </div>
         </div>
       </footer>
     </div>
+    </BrandContext.Provider>
   );
 }

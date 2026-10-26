@@ -8,6 +8,7 @@ import { TenantService } from './tenant.service';
 import { NexusSsoService } from './nexus-sso.service';
 import { CrearTenantDto } from './dto/crear-tenant.dto';
 import { NexusSsoDto } from './dto/nexus-sso.dto';
+import { UiTenantDto } from './dto/ui-tenant.dto';
 import { ConfigurarSeguroDto } from '../seguro/dto/seguro-config.dto';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
@@ -69,6 +70,7 @@ export class AuthController {
       sessionToken,
       expiresAt,
       tenant: { id: tenant.id, nombre: tenant.nombre },
+      ui: tenant.config?.ui ?? null,
       nexus: {
         empresaId: payload.empresaId,
         empresaNombre: hb.empresaNombre ?? payload.empresaNombre ?? null,
@@ -103,6 +105,7 @@ export class AuthController {
         id:     tenant.id,
         nombre: tenant.nombre,
       },
+      ui: tenant.config?.ui ?? null,
     };
   }
 }
@@ -144,6 +147,12 @@ export class TenantController {
   async desactivar(@Param('id', ParseUUIDPipe) id: string) {
     await this.tenantService.desactivar(id);
     return { mensaje: 'Tenant desactivado correctamente.' };
+  }
+
+  @Put(':id/ui')
+  @ApiOperation({ summary: 'Marca propia de la flota en pantalla (nombre, logo, colores); sobrescribe la del despliegue' })
+  async actualizarUi(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UiTenantDto) {
+    return { ui: await this.tenantService.actualizarUi(id, { ...dto }) };
   }
 
   @Get('polizas-criticas')
