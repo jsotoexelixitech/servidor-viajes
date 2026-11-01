@@ -125,6 +125,8 @@ ensure_env NEXUS_API_URL http://127.0.0.1:3092
 ensure_env FLOTA_NEXUS_TENANT_DEFAULT Ridery
 # Pantalla para La Mundial: solo acceso desde Nexus (sin campo de API key). Marca/colores: ver .env.example (UI_*).
 ensure_env UI_AUTH_MODES nexus
+# Cobro por viaje (Ridery): usuario Sis2000 de los recibos. El recibo real sigue apagado (FLOTA_RECIBO_REAL=0).
+ensure_env FLOTA_CUSUARIO 1
 
 # ── 2. Backend ─────────────────────────────────────────────────────────────
 echo "▶ Backend: npm ci + build"

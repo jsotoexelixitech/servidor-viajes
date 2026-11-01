@@ -135,6 +135,9 @@ export class FlotaService {
   async finalizarViaje(tenantId: string, dto: FinViajeDto): Promise<FlotaViaje> {
     const viaje = await this.viajeRepo.findOne({ where: { tenantId, idExterno: dto.idExterno } });
     if (!viaje) throw new NotFoundException(`Viaje ${dto.idExterno} no existe (debe iniciarse primero).`);
+    if (viaje.modoCobro === 'POR_VIAJE') {
+      throw new BadRequestException(`Viaje ${dto.idExterno} es de cobro por viaje: use POST /flota/viajes/evento.`);
+    }
     if (viaje.estado === EstadoViajeFlota.FINALIZADO) return viaje; // idempotente
     if (viaje.estado === EstadoViajeFlota.CANCELADO) {
       throw new BadRequestException(`Viaje ${dto.idExterno} está cancelado.`);
@@ -160,6 +163,9 @@ export class FlotaService {
   async cancelarViaje(tenantId: string, dto: CancelarViajeDto): Promise<FlotaViaje> {
     const viaje = await this.viajeRepo.findOne({ where: { tenantId, idExterno: dto.idExterno } });
     if (!viaje) throw new NotFoundException(`Viaje ${dto.idExterno} no existe.`);
+    if (viaje.modoCobro === 'POR_VIAJE') {
+      throw new BadRequestException(`Viaje ${dto.idExterno} es de cobro por viaje: use POST /flota/viajes/evento.`);
+    }
     if (viaje.estado === EstadoViajeFlota.FINALIZADO) {
       throw new BadRequestException('No se puede cancelar un viaje finalizado.');
     }
@@ -180,13 +186,15 @@ export class FlotaService {
   }
 
   /** Resumen del mes: totales y detalle por conductor (participación = prorrateo del recibo). */
-  async resumen(tenantId: string, periodo = periodoActual()) {
+  async resumen(tenantId: string, periodo = periodoActual(), soloMensual = false) {
     const { desdeD, hastaD, desde, hasta } = rangoMes(periodo);
-    const finalizados = await this.viajeRepo.createQueryBuilder('v')
+    const qbFin = this.viajeRepo.createQueryBuilder('v')
       .where('v.tenant_id = :tenantId', { tenantId })
       .andWhere('v.estado = :estado', { estado: EstadoViajeFlota.FINALIZADO })
-      .andWhere('v.fin >= :desde AND v.fin < :hasta', { desde: desdeD, hasta: hastaD })
-      .getMany();
+      .andWhere('v.fin >= :desde AND v.fin < :hasta', { desde: desdeD, hasta: hastaD });
+    // El cierre mensual no incluye los viajes de cobro por viaje (cada uno ya tiene su recibo).
+    if (soloMensual) qbFin.andWhere("v.modo_cobro = 'MENSUAL'");
+    const finalizados = await qbFin.getMany();
     const enCurso = await this.viajeRepo.count({ where: { tenantId, estado: EstadoViajeFlota.INICIADO } });
 
     const total = finalizados.reduce((a, v) => a + num(v.costo), 0);
@@ -337,7 +345,7 @@ export class FlotaService {
     if (existente && !EDITABLES.includes(existente.estado)) {
       throw new BadRequestException(`El cierre ${periodo} ya tiene recibo (${existente.cnrecibo}).`);
     }
-    const r = await this.resumen(tenantId, periodo);
+    const r = await this.resumen(tenantId, periodo, true);
     const cierre = existente ?? this.cierreRepo.create({ tenantId, periodo });
     Object.assign(cierre, {
       cnpoliza: r.cnpoliza,
@@ -412,6 +420,7 @@ export class FlotaService {
       .where('v.tenant_id = :tenantId', { tenantId })
       .andWhere('v.estado = :estado', { estado: EstadoViajeFlota.FINALIZADO })
       .andWhere('v.fin >= :desde AND v.fin < :hasta', { desde: desdeD, hasta: hastaD })
+      .andWhere("v.modo_cobro = 'MENSUAL'")
       .getRawMany<{ id: string }>()).map((r) => r.id);
     if (ids.length) await this.viajeRepo.update({ id: In(ids) }, { cierreId: cierre.id });
     return cierre;
@@ -421,7 +430,7 @@ export class FlotaService {
   async detalleCierre(tenantId: string, cierreId: string) {
     const cierre = await this.cierreRepo.findOne({ where: { id: cierreId, tenantId } });
     if (!cierre) throw new NotFoundException('Cierre no encontrado.');
-    return { cierre, resumen: await this.resumen(tenantId, cierre.periodo) };
+    return { cierre, resumen: await this.resumen(tenantId, cierre.periodo, true) };
   }
 
   /** Cierre automático: todos los días a la 01:30; corre si hoy es el día de cierre configurado. */

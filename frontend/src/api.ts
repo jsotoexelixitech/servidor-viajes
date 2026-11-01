@@ -429,4 +429,92 @@ export const flotaApi = {
     api.get<{ cierre: FlotaCierre; resumen: FlotaResumen }>(`/flota/cierres/${id}`),
   generarRecibo: (id: string, modo: 'SIMULADO' | 'REAL' = 'SIMULADO') =>
     api.post<FlotaCierre>(`/flota/cierres/${id}/recibo`, { modo }),
+
+  // Cobro por viaje: clasificación de distancia, certificados y recibos por viaje
+  tarifasDistancia: () => api.get<FlotaTarifaDistancia[]>('/flota/tarifas-distancia'),
+  guardarTarifasDistancia: (tarifas: FlotaTarifaDistanciaInput[]) =>
+    api.put<FlotaTarifaDistancia[]>('/flota/tarifas-distancia', { tarifas }),
+  cotizarDistancia: (km: number, clasificacion?: Clasificacion) =>
+    api.post<FlotaCotizacion>('/flota/tarifas-distancia/cotizar', { km, ...(clasificacion ? { clasificacion } : {}) }),
+  certificados: () => api.get<FlotaCertificado[]>('/flota/certificados'),
+  guardarCertificado: (data: { cnpoliza?: string; ccerti: number; placa?: string; conductorDoc?: string; conductorNombre?: string; activo?: boolean }) =>
+    api.put<FlotaCertificado>('/flota/certificados', data),
+  desactivarCertificado: (id: string) => api.delete<FlotaCertificado>(`/flota/certificados/${id}`),
+  sincronizarCertificados: () =>
+    api.post<{ cnpoliza: string; leidos: number; nuevos: number; actualizados: number }>('/flota/certificados/sincronizar', {}),
+  pagos: (limit = 100) => api.get<FlotaPagoViaje[]>(`/flota/pagos?limit=${limit}`),
+  reintentarRecibo: (id: string) => api.post(`/flota/pagos/${id}/reintentar`, {}),
 };
+
+export type Clasificacion = 'URBANO' | 'EXTRA_URBANO';
+export type RedondeoKm = 'NINGUNO' | 'KM_ARRIBA' | 'KM_CERCANO';
+
+export interface FlotaTarifaDistancia {
+  id?: string;
+  clasificacion: Clasificacion;
+  nombre: string;
+  kmDesde: string | number;
+  kmHasta: string | number | null;
+  tarifaKm: string | number;
+  minimo: string | number;
+  redondeo: RedondeoKm;
+  moneda: string;
+  activa: boolean;
+  actualizadoPor?: string | null;
+  actualizadoEn?: string;
+}
+
+export interface FlotaTarifaDistanciaInput {
+  clasificacion: Clasificacion;
+  nombre?: string;
+  kmDesde: number;
+  kmHasta: number | null;
+  tarifaKm: number;
+  minimo: number;
+  redondeo: RedondeoKm;
+  moneda: string;
+  activa: boolean;
+}
+
+export interface FlotaCotizacion {
+  clasificacion: Clasificacion;
+  nombre: string;
+  km: number;
+  kmCobrados: number;
+  tarifaKm: number;
+  minimo: number;
+  minimoAplicado: boolean;
+  monto: number;
+  moneda: string;
+}
+
+export interface FlotaCertificado {
+  id: string;
+  cnpoliza: string;
+  ccerti: number;
+  placa: string | null;
+  conductorDoc: string | null;
+  conductorNombre: string | null;
+  istatcer: string | null;
+  activo: boolean;
+  origen: 'MANUAL' | 'SIS2000';
+  actualizadoEn: string;
+}
+
+export interface FlotaPagoViaje {
+  id: string;
+  idExterno: string;
+  monto: string;
+  moneda: string;
+  referencia: string;
+  metodo: string | null;
+  fechaPago: string;
+  cnpoliza: string | null;
+  ccerti: number | null;
+  estado: 'RECIBO_SIMULADO' | 'RECIBO_GENERADO' | 'ERROR';
+  modo: 'SIMULADO' | 'REAL';
+  cnrecibo: string | null;
+  error: string | null;
+  intentos: number;
+  creadoEn: string;
+}

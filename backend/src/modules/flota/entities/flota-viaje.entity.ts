@@ -69,6 +69,36 @@ export class FlotaViaje {
   @Column({ type: 'jsonb', nullable: true })
   destino: Record<string, unknown> | null;
 
+  // ── Cobro por viaje (recibo por viaje sobre el certificado del conductor) ──
+
+  /** MENSUAL = entra al cierre del mes · POR_VIAJE = se paga y genera recibo por viaje (no entra al cierre). */
+  @Column({ name: 'modo_cobro', type: 'varchar', length: 12, default: 'MENSUAL' })
+  modoCobro: 'MENSUAL' | 'POR_VIAJE';
+
+  /** URBANO / EXTRA_URBANO (cobro por viaje). */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  clasificacion: string | null;
+
+  @Column({ name: 'tarifa_km', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  tarifaKm: string | null;
+
+  @Column({ name: 'km_estimados', type: 'numeric', precision: 12, scale: 3, nullable: true })
+  kmEstimados: string | null;
+
+  @Column({ name: 'monto_estimado', type: 'numeric', precision: 18, scale: 2, nullable: true })
+  montoEstimado: string | null;
+
+  /** Póliza y certificado del conductor al que va el recibo del viaje. */
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  cnpoliza: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  ccerti: number | null;
+
+  /** PENDIENTE (monto devuelto, falta el pago) · PAGADO. */
+  @Column({ name: 'estado_pago', type: 'varchar', length: 12, nullable: true })
+  estadoPago: 'PENDIENTE' | 'PAGADO' | null;
+
   /** Generado por el simulador (pruebas). */
   @Column({ type: 'boolean', default: false })
   simulado: boolean;

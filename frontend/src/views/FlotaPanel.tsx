@@ -3,6 +3,7 @@ import type { Notif } from '../types';
 import {
   flotaApi, FlotaCierre, FlotaConductorResumen, FlotaConfig, FlotaResumen, FlotaViaje,
 } from '../api';
+import { CertificadosTab, DistanciaTab, RecibosViajeTab } from './FlotaCobroViajeTabs';
 import { KpiCard } from '../components/ui/KpiCard';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -15,7 +16,7 @@ import { useBrand } from '../lib/branding';
  */
 
 type PushNotif = (tipo: Notif['tipo'], titulo: string, msg: string) => void;
-type SubTab = 'resumen' | 'feed' | 'conductores' | 'cierres' | 'config' | 'simulador';
+type SubTab = 'resumen' | 'feed' | 'conductores' | 'cierres' | 'config' | 'distancia' | 'certificados' | 'recibos' | 'simulador';
 
 const SUBTABS: { id: SubTab; label: string; icon: (p?: string) => React.ReactNode }[] = [
   { id: 'resumen',     label: 'Resumen del mes',    icon: Ic.grid },
@@ -23,6 +24,9 @@ const SUBTABS: { id: SubTab; label: string; icon: (p?: string) => React.ReactNod
   { id: 'conductores', label: 'Conductores',        icon: Ic.users },
   { id: 'cierres',     label: 'Cierres y recibo',   icon: Ic.cash },
   { id: 'config',      label: 'Cobro',              icon: Ic.gear },
+  { id: 'distancia',   label: 'Urbano / extra urbano', icon: Ic.car },
+  { id: 'certificados', label: 'Certificados',     icon: Ic.shield },
+  { id: 'recibos',     label: 'Recibos por viaje',  icon: Ic.rows },
   { id: 'simulador',   label: 'Simulador',          icon: Ic.sparkle },
 ];
 
@@ -113,6 +117,9 @@ export function FlotaPanel({
       {sub === 'conductores' && <ConductoresTab periodo={periodo} pushNotif={pushNotif} />}
       {sub === 'cierres'     && <CierresTab periodo={periodo} pushNotif={pushNotif} />}
       {sub === 'config'      && <ConfigTab pushNotif={pushNotif} />}
+      {sub === 'distancia'   && <DistanciaTab pushNotif={pushNotif} />}
+      {sub === 'certificados' && <CertificadosTab pushNotif={pushNotif} />}
+      {sub === 'recibos'     && <RecibosViajeTab pushNotif={pushNotif} />}
       {sub === 'simulador'   && <SimuladorTab periodo={periodo} pushNotif={pushNotif} onDone={() => setSub('cierres')} />}
     </div>
   );
