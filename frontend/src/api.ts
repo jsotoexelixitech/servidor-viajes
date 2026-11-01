@@ -58,6 +58,11 @@ export const authApi = {
       sessionToken: string; expiresAt: string; tenant: { id: string; nombre: string }; ui?: Partial<UiConfig> | null;
       nexus: { empresaId: number; empresaNombre: string | null; submoduloId: number; metadata: Record<string, unknown> };
     }>('/auth/nexus', { nexus_token: nexusToken }),
+  /** Acceso directo (solo si el servidor tiene FLOTA_ACCESO_DIRECTO=1): session token sin Nexus ni API key. */
+  directo: () =>
+    buildLoginClient().post<{
+      sessionToken: string; expiresAt: string; tenant: { id: string; nombre: string }; ui?: Partial<UiConfig> | null; directo: true;
+    }>('/auth/directo', {}),
 };
 
 /** Marca, colores y modos de acceso de la pantalla (por despliegue; cada flota puede sobrescribir su marca). */
@@ -71,6 +76,8 @@ export interface UiConfig {
     accent: string; accentCta: string; accentHover: string;
   };
   authModes: Array<'nexus' | 'apikey'>;
+  /** true solo con FLOTA_ACCESO_DIRECTO=1 en el servidor (demo / red interna). */
+  accesoDirecto?: boolean;
 }
 
 export const uiApi = {

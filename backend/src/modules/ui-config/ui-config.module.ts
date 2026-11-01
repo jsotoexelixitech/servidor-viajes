@@ -1,5 +1,6 @@
 import { Controller, Get, Module } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { accesoDirectoActivo } from '../tenant/acceso-directo.service';
 
 /**
  * Configuración de la pantalla por despliegue (marca, colores y modos de acceso).
@@ -17,6 +18,8 @@ export interface UiConfig {
   };
   /** 'nexus' = entra solo desde Nexus (SSO); 'apikey' = campo de API key (uso interno / otras conexiones). */
   authModes: Array<'nexus' | 'apikey'>;
+  /** true solo con FLOTA_ACCESO_DIRECTO=1: el link abre directo la flota configurada (demo / red interna). */
+  accesoDirecto: boolean;
 }
 
 /** Si la variable está definida manda su valor (vacío incluido: p. ej. sin sufijo de marca); si no, el valor por defecto. */
@@ -40,6 +43,7 @@ export function uiConfigFromEnv(): UiConfig {
       accentHover:   env('UI_COLOR_ACCENT_HOVER', '#BF3534'),
     },
     authModes: modos.length ? modos : ['nexus'],
+    accesoDirecto: accesoDirectoActivo(),
   };
 }
 

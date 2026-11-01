@@ -127,6 +127,10 @@ ensure_env FLOTA_NEXUS_TENANT_DEFAULT Ridery
 ensure_env UI_AUTH_MODES nexus
 # Cobro por viaje (Ridery): usuario Sis2000 de los recibos. El recibo real sigue apagado (FLOTA_RECIBO_REAL=0).
 ensure_env FLOTA_CUSUARIO 1
+# Acceso directo SOLO en el 120 (demo / red interna): el link abre la flota Ridery sin Nexus ni API key.
+# Es acceso sin autenticación. Para apagarlo: FLOTA_ACCESO_DIRECTO=0 en backend/.env (este script no lo vuelve a encender).
+ensure_env FLOTA_ACCESO_DIRECTO 1
+ensure_env FLOTA_ACCESO_DIRECTO_TENANT Ridery
 
 # ── 2. Backend ─────────────────────────────────────────────────────────────
 echo "▶ Backend: npm ci + build"

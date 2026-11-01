@@ -93,7 +93,7 @@ export default function App() {
   const apikeyMode = brand.authModes.includes('apikey');
   useEffect(() => {
     uiApi.get()
-      .then((r) => { const b = mergeBrand(BRAND_DEFAULT, r.data); setBrand(b); applyBranding(b); })
+      .then((r) => { const b = mergeBrand(BRAND_DEFAULT, r.data); setBrand(b); applyBranding(b); setDirectoDisponible(r.data?.accesoDirecto === true); })
       .catch(() => applyBranding(BRAND_DEFAULT));
   }, []);
   // Sin modo apikey no existe el modo demo.
@@ -109,6 +109,9 @@ export default function App() {
   const [ssoMode,    setSsoMode]    = useState(false);
   const [ssoEmpresa, setSsoEmpresa] = useState('');
   const [ssoError,   setSsoError]   = useState('');
+  // Acceso directo (demo / red interna): solo si el servidor lo anuncia en /config/ui (FLOTA_ACCESO_DIRECTO=1).
+  const [directoDisponible, setDirectoDisponible] = useState(false);
+  const [directoMode,       setDirectoMode]       = useState(false);
   const [notifs,        setNotifs]        = useState<Notif[]>([]);
   const [notifOpen,     setNotifOpen]     = useState(false);
 
@@ -244,6 +247,29 @@ export default function App() {
     }
     if (token) void loginWithNexus(token);
   }, [loginWithNexus]);
+
+  // Acceso directo: sin nexus_token ni API key, el link abre directo en Flota por uso → cobro por viaje.
+  useEffect(() => {
+    if (!directoDisponible || apiKeySet || ssoMode || EMBED) return;
+    let nexusGuardado: string | null = null;
+    try { nexusGuardado = sessionStorage.getItem(NEXUS_TOKEN_KEY); } catch { /* sin storage */ }
+    if (QS.get('nexus_token') || nexusGuardado) return;
+    let vivo = true;
+    setApiKeyLoading(true);
+    authApi.directo()
+      .then((res) => {
+        if (!vivo) return;
+        setSessionToken(res.data.sessionToken);
+        setDirectoMode(true);
+        setApiKeySet(true);
+        setTenantNombreConectado(res.data.tenant.nombre);
+        aplicarMarcaFlota(res.data.ui);
+        setTab('flota');
+      })
+      .catch((e: unknown) => { if (vivo) pushNotif('error', 'Acceso directo', friendlyError(e).mensaje); })
+      .finally(() => { if (vivo) setApiKeyLoading(false); });
+    return () => { vivo = false; };
+  }, [directoDisponible, apiKeySet, ssoMode, aplicarMarcaFlota, pushNotif]);
 
   const toggleDemo = useCallback(async () => {
     const next = !demoOn;
@@ -445,7 +471,7 @@ export default function App() {
   return (
     <BrandContext.Provider value={brand}>
     <div className="min-h-screen flex flex-col bg-[#F4F5F8]">
-      {!ssoMode && <WelcomeSplash />}
+      {!ssoMode && !directoMode && !directoDisponible && <WelcomeSplash />}
       {toaster}
 
       {polizaPreview && <PolizaModal viaje={polizaPreview} onClose={() => setPolizaPreview(null)} />}
@@ -528,6 +554,7 @@ export default function App() {
           demoOn={demoOn}
           navItems={NAV}
           ssoMode={ssoMode}
+          directoMode={directoMode}
           onNavTo={navTo}
           onOverlayClick={() => setSidebarOpen(false)}
         />
@@ -550,7 +577,7 @@ export default function App() {
           )}
 
           {tab === 'flota' && apiKeySet && (
-            <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} />
+            <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} subInicial={directoMode ? 'distancia' : undefined} />
           )}
           {tab === 'flota' && !apiKeySet && ssoMode && <SsoEstado loading={apiKeyLoading} error={ssoError} />}
           {tab === 'flota' && !apiKeySet && !ssoMode && !apikeyMode && (

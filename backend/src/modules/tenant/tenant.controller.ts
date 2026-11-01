@@ -1,11 +1,12 @@
 import {
   Controller, Post, Get, Put, Body, Param, Headers,
   ParseUUIDPipe, HttpCode, HttpStatus, UseGuards,
-  UnauthorizedException, ForbiddenException,
+  UnauthorizedException, ForbiddenException, Ip,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
 import { TenantService } from './tenant.service';
 import { NexusSsoService } from './nexus-sso.service';
+import { AccesoDirectoService } from './acceso-directo.service';
 import { CrearTenantDto } from './dto/crear-tenant.dto';
 import { NexusSsoDto } from './dto/nexus-sso.dto';
 import { UiTenantDto } from './dto/ui-tenant.dto';
@@ -46,7 +47,20 @@ export class AuthController {
     private readonly sessionService: SessionService,
     private readonly tenantService: TenantService,
     private readonly nexusSso: NexusSsoService,
+    private readonly accesoDirecto: AccesoDirectoService,
   ) {}
+
+  @Post('directo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Acceso directo (demo / red interna): session token de la flota configurada, sin Nexus ni API key',
+    description: 'Solo existe con FLOTA_ACCESO_DIRECTO=1 (apagado por defecto → 404). Flota: FLOTA_ACCESO_DIRECTO_TENANT o FLOTA_NEXUS_TENANT_DEFAULT. Es acceso SIN autenticación: no habilitar fuera de la red interna.',
+  })
+  @ApiResponse({ status: 200, description: 'Sesión iniciada para la flota configurada.' })
+  @ApiResponse({ status: 404, description: 'Acceso directo desactivado o flota inexistente.' })
+  async loginDirecto(@Ip() ip: string) {
+    return this.accesoDirecto.iniciar(ip);
+  }
 
   @Post('nexus')
   @HttpCode(HttpStatus.OK)

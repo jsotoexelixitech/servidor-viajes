@@ -16,7 +16,7 @@ import { useBrand } from '../lib/branding';
  */
 
 type PushNotif = (tipo: Notif['tipo'], titulo: string, msg: string) => void;
-type SubTab = 'resumen' | 'feed' | 'conductores' | 'cierres' | 'config' | 'distancia' | 'certificados' | 'recibos' | 'simulador';
+export type SubTab = 'resumen' | 'feed' | 'conductores' | 'cierres' | 'config' | 'distancia' | 'certificados' | 'recibos' | 'simulador';
 
 const SUBTABS: { id: SubTab; label: string; icon: (p?: string) => React.ReactNode }[] = [
   { id: 'resumen',     label: 'Resumen del mes',    icon: Ic.grid },
@@ -63,14 +63,16 @@ const ESTADO_CIERRE: Record<string, { cls: string; label: string }> = {
 
 // ── Contenedor ──────────────────────────────────────────────────────────────
 export function FlotaPanel({
-  pushNotif, demoOn, tenantNombre, embed,
+  pushNotif, demoOn, tenantNombre, embed, subInicial,
 }: {
   pushNotif: PushNotif;
   demoOn: boolean;
   tenantNombre?: string;
   embed?: boolean;
+  /** Pestaña con la que abre (acceso directo → cobro por viaje). */
+  subInicial?: SubTab;
 }) {
-  const [sub, setSub] = useState<SubTab>('resumen');
+  const [sub, setSub] = useState<SubTab>(subInicial ?? 'resumen');
   const [periodo, setPeriodo] = useState(mesActual());
 
   if (demoOn) {

@@ -21,12 +21,14 @@ export interface AppSidebarProps {
   onNavTo: (id: Tab) => void;
   onOverlayClick: () => void;
   ssoMode?: boolean;
+  /** Sesión abierta por el acceso directo (FLOTA_ACCESO_DIRECTO=1). */
+  directoMode?: boolean;
 }
 
 const SECTIONS = ['Análisis', 'Operación', 'Histórico'] as const;
 
 export function AppSidebar({
-  open, tab, apiKeySet, demoOn, navItems, onNavTo, onOverlayClick, ssoMode = false,
+  open, tab, apiKeySet, demoOn, navItems, onNavTo, onOverlayClick, ssoMode = false, directoMode = false,
 }: AppSidebarProps) {
   const brand = useBrand();
   const conClave = !ssoMode && brand.authModes.includes('apikey');
@@ -68,9 +70,12 @@ export function AppSidebar({
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full shrink-0 ${apiKeySet ? 'bg-emerald-500' : 'bg-amber-500'}`} />
               <p className={`text-[11px] font-semibold leading-snug ${apiKeySet ? 'text-[#0F1A5A]' : 'text-[#7A4B00]'}`}>
-                {apiKeySet ? (ssoMode ? 'Sesión iniciada desde Nexus' : 'Flota conectada') : ssoMode ? 'Validando acceso…' : conClave ? 'Sin flota conectada' : 'Acceso desde Nexus'}
+                {apiKeySet ? (directoMode ? 'Acceso directo (demo)' : ssoMode ? 'Sesión iniciada desde Nexus' : 'Flota conectada') : ssoMode ? 'Validando acceso…' : conClave ? 'Sin flota conectada' : 'Acceso desde Nexus'}
               </p>
             </div>
+            {apiKeySet && directoMode && (
+              <p className="text-[10px] text-[#5A6076] mt-1">Sin autenticación: solo red interna / demostración.</p>
+            )}
             {!apiKeySet && !ssoMode && (
               <p className="text-[10px] text-[#7A4B00] mt-1">
                 {conClave ? 'Conecta la API key de la plataforma para activar todas las funciones.' : 'Abre este módulo desde Nexus para activar todas las funciones.'}

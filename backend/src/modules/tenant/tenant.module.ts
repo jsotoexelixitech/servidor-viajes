@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tenant } from './entities/tenant.entity';
 import { TenantService } from './tenant.service';
 import { NexusSsoService } from './nexus-sso.service';
+import { AccesoDirectoService } from './acceso-directo.service';
 import { TenantController, TenantSelfController, AuthController } from './tenant.controller';
 import { SeguroModule } from '../seguro/seguro.module';
 import { AdminGuard } from '../../common/guards/admin.guard';
@@ -10,7 +11,7 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 @Module({
   imports: [TypeOrmModule.forFeature([Tenant]), forwardRef(() => SeguroModule)],
   controllers: [AuthController, TenantController, TenantSelfController],
-  providers: [TenantService, NexusSsoService, AdminGuard],
+  providers: [TenantService, NexusSsoService, AccesoDirectoService, AdminGuard],
   exports: [TenantService],
 })
 export class TenantModule {}
