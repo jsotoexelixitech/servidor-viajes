@@ -189,6 +189,45 @@ export class RegistrarPolizaDto {
   forzar?: boolean;
 }
 
+/** Opción (a): crear la póliza de flota en Sis2000 vía nest-api (sp_flota_crear_poliza_nexus) y registrarla. */
+export class CrearPolizaFlotaDto {
+  @ApiProperty({ example: 'J-12345678-9', description: 'Cédula/RIF del tomador (Ridery); debe existir en maclient.' })
+  @IsString() @MaxLength(20)
+  tomadorRif: string;
+
+  @ApiPropertyOptional({ example: 'Ridery Venezuela, C.A.' })
+  @IsOptional() @IsString() @MaxLength(150)
+  tomadorNombre?: string;
+
+  @ApiProperty({ example: 'RIDER1', description: 'Plan de la flota en Sis2000.' })
+  @IsString() @MaxLength(10)
+  cplan: string;
+
+  @ApiPropertyOptional({ example: 18, description: 'Ramo (18 = automóvil). Por defecto 18.' })
+  @IsOptional() @IsInt() @Min(1)
+  cramo?: number;
+
+  @ApiProperty({ example: '2026-11-01' })
+  @IsDateString()
+  fdesde: string;
+
+  @ApiProperty({ example: '2027-11-01' })
+  @IsDateString()
+  fhasta: string;
+
+  @ApiPropertyOptional({ example: 80080 })
+  @IsOptional() @IsInt()
+  cproductor?: number;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional() @IsInt()
+  csucur?: number;
+
+  @ApiPropertyOptional({ example: 'USD', description: "USD / VES (o '$' / 'Bs'). Por defecto USD." })
+  @IsOptional() @IsString() @MaxLength(4)
+  moneda?: string;
+}
+
 export class AnularReciboDto {
   @ApiProperty({ example: 'Viaje reversado por la plataforma' })
   @IsString() @MaxLength(250)

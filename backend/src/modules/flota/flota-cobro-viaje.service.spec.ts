@@ -47,17 +47,21 @@ function setup(real = false) {
   const pagos = fakeRepo();
   const flota = { getConfig: async () => ({ cnpoliza: POLIZA }) } as unknown as FlotaService;
   const crearReciboCertificado = jest.fn().mockResolvedValue({ cnrecibo: '18-998877', crecibo: '998877', yaExistia: false, data: { status: true } });
+  const incluirCertificado = jest.fn().mockResolvedValue({ ccerti: 41, data: { status: true } });
+  const excluirCertificado = jest.fn().mockResolvedValue({ status: true });
   const sis2000 = {
     reciboRealActivo: () => real,
     cusuario: () => 1,
     rutaRecibo: (p: string, c: number) => `/api/flota/polizas/${p}/certificados/${c}/recibos`,
     crearReciboCertificado,
+    incluirCertificado,
+    excluirCertificado,
   } as unknown as FlotaSis2000Client;
   // tarifaRepo.find con order: el fake ignora el orden (ya vienen ordenadas).
   const recibosRepo = fakeRepo();
   const recibos = new FlotaRecibosService(recibosRepo as never, fakeRepo() as never, certs as never, flota, sis2000, { get: () => undefined } as never);
   const svc = new FlotaCobroViajeService(viajes as never, tarifas as never, certs as never, pagos as never, flota, sis2000, recibos);
-  return { svc, viajes, pagos, crearReciboCertificado, recibosRepo, recibos };
+  return { svc, viajes, pagos, certs, crearReciboCertificado, incluirCertificado, excluirCertificado, recibosRepo, recibos };
 }
 
 describe('calcularMontoDistancia', () => {
@@ -184,5 +188,65 @@ describe('FlotaCobroViajeService', () => {
     await expect(svc.pagar(T, { idViaje: 'RDY-1', monto: 1, referencia: 'P1' })).rejects.toBeInstanceOf(ConflictException);
     await svc.evento(T, fin);
     await expect(svc.evento(T, { idViaje: 'RDY-1', tipo: 'CANCELACION' })).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('certificados con FLOTA_RECIBO_REAL=1', () => {
+  it('incluye en Sis2000 sin recibo y guarda el ccerti REAL devuelto', async () => {
+    const { svc, incluirCertificado } = setup(true);
+    const c = await svc.guardarCertificado(T, { placa: 'xy987zz', conductorDoc: 'V-87654321', conductorNombre: 'Ana Gómez' });
+    expect(incluirCertificado).toHaveBeenCalledWith(POLIZA, expect.objectContaining({
+      xplaca: 'XY987ZZ', conductor: { cid: 'V-87654321', nombre: 'ANA GÓMEZ' },
+    }));
+    expect(c).toMatchObject({ ccerti: 41, origen: 'SIS2000', activo: true });
+  });
+
+  it('sin FLOTA_RECIBO_REAL usa la numeración local y no llama a Sis2000', async () => {
+    const { svc, incluirCertificado } = setup(false);
+    const c = await svc.guardarCertificado(T, { placa: 'XY987ZZ', conductorDoc: 'V-87654321', conductorNombre: 'Ana' });
+    expect(incluirCertificado).not.toHaveBeenCalled();
+    expect(c).toMatchObject({ ccerti: 4, origen: 'MANUAL' });
+  });
+
+  it('al desactivar un certificado de Sis2000 llama a la exclusión', async () => {
+    const { svc, certs, excluirCertificado } = setup(true);
+    (certs.rows[0] as Record<string, unknown>).origen = 'SIS2000';
+    const c = await svc.desactivarCertificado(T, 'c1');
+    expect(excluirCertificado).toHaveBeenCalledWith(POLIZA, 3, expect.any(String));
+    expect(c.activo).toBe(false);
+  });
+
+  it('si la exclusión falla no se desactiva', async () => {
+    const { svc, certs, excluirCertificado } = setup(true);
+    (certs.rows[0] as Record<string, unknown>).origen = 'SIS2000';
+    excluirCertificado.mockRejectedValueOnce(Object.assign(new Error('x'), { response: { status: 400, data: { message: 'no vigente' } } }));
+    await expect(svc.desactivarCertificado(T, 'c1')).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect((certs.rows[0] as Record<string, unknown>).activo).toBe(true);
+  });
+});
+
+describe('sincronizar recibos pendientes', () => {
+  const inicio = { idViaje: 'RDY-5', tipo: 'INICIO' as const, fecha: '2026-11-01T14:00:00Z', placa: 'xx999', conductorDoc: 'V-12.345.678', kmEstimados: 8 };
+  const fin = { idViaje: 'RDY-5', tipo: 'FIN' as const, fecha: '2026-11-01T14:30:00Z', km: 9.1 };
+
+  it('reintenta el recibo COBRADO con sync ERROR y lo deja OK con cnrecibo de Sis2000', async () => {
+    const { svc, recibos, recibosRepo, crearReciboCertificado } = setup(true);
+    await svc.evento(T, inicio);
+    await svc.evento(T, fin);
+    crearReciboCertificado.mockRejectedValueOnce(Object.assign(new Error('caído'), { response: { status: 500 } }));
+    const p = await svc.pagar(T, { idViaje: 'RDY-5', monto: 1, referencia: 'P5' });
+    expect(p.pago.recibo.estado).toBe('ERROR');
+    const pendientes = () => recibosRepo.rows.filter((r) => r.estado === 'COBRADO' && ['PENDIENTE', 'ERROR'].includes(String(r.syncSis2000)));
+    expect(pendientes()).toHaveLength(1);
+    jest.spyOn(recibos, 'listar').mockImplementation(async () => ({ cnpoliza: POLIZA, recibos: pendientes() }) as never);
+    const r = await svc.sincronizarRecibosPendientes(T);
+    expect(r).toMatchObject({ intentados: 1, ok: 1, error: 0 });
+    expect(r.resultados[0].cnrecibo).toBe('18-998877');
+    expect(recibosRepo.rows[0]).toMatchObject({ syncSis2000: 'OK', cnreciboSis2000: '18-998877' });
+  });
+
+  it('sin FLOTA_RECIBO_REAL=1 no sincroniza', async () => {
+    const { svc } = setup(false);
+    await expect(svc.sincronizarRecibosPendientes(T)).rejects.toThrow('FLOTA_RECIBO_REAL=1');
   });
 });

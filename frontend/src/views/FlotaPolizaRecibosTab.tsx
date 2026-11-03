@@ -37,6 +37,12 @@ const SYNC_LABEL: Record<FlotaRecibo['syncSis2000'], string> = {
 export function PolizaRecibosTab({ pushNotif }: { pushNotif: PushNotif }) {
   const [pol, setPol] = useState<FlotaPolizaActual | null>(null);
   const [form, setForm] = useState({ cnpoliza: '', tomadorNombre: '', tomadorRif: '', forzar: false });
+  const [nueva, setNueva] = useState(() => {
+    const d = new Date();
+    const h = new Date(d);
+    h.setFullYear(d.getFullYear() + 1);
+    return { cplan: '', fdesde: d.toISOString().slice(0, 10), fhasta: h.toISOString().slice(0, 10) };
+  });
   const [filtro, setFiltro] = useState({ ccerti: '', desde: '', hasta: '', estado: '' });
   const [data, setData] = useState<FlotaRecibosRespuesta | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -75,6 +81,32 @@ export function PolizaRecibosTab({ pushNotif }: { pushNotif: PushNotif }) {
       await cargarPoliza();
       await cargarRecibos();
     } catch (e) { pushNotif('error', 'No se pudo registrar', errMsg(e)); } finally { setBusy(null); }
+  };
+
+  const crear = async () => {
+    if (!window.confirm('Se creará la póliza de flota en Sis2000 (sin recibos) y quedará como póliza de la flota. ¿Continuar?')) return;
+    setBusy('crear');
+    try {
+      const { data: r } = await flotaApi.crearPoliza({
+        tomadorRif: form.tomadorRif.trim(), tomadorNombre: form.tomadorNombre, cplan: nueva.cplan.trim(),
+        fdesde: nueva.fdesde, fhasta: nueva.fhasta,
+      });
+      pushNotif('success', 'Póliza creada en Sis2000', r.creada.cnpoliza);
+      setForm((f) => ({ ...f, cnpoliza: r.creada.cnpoliza }));
+      await cargarPoliza();
+      await cargarRecibos();
+    } catch (e) { pushNotif('error', 'No se pudo crear la póliza', errMsg(e)); } finally { setBusy(null); }
+  };
+
+  const sincronizar = async () => {
+    setBusy('sync');
+    try {
+      const { data: r } = await flotaApi.sincronizarRecibos();
+      const conError = r.error ? ` · ${r.error} con error` : '';
+      pushNotif(r.error ? 'warning' : 'success', 'Sincronizar pendientes',
+        r.intentados ? `${r.ok} de ${r.intentados} recibos subidos a Sis2000${conError}.` : 'No hay recibos pendientes.');
+      await cargarRecibos();
+    } catch (e) { pushNotif('error', 'Sincronizar pendientes', errMsg(e)); } finally { setBusy(null); }
   };
 
   const csv = async () => {
@@ -138,6 +170,30 @@ export function PolizaRecibosTab({ pushNotif }: { pushNotif: PushNotif }) {
           <input type="checkbox" checked={form.forzar} onChange={(e) => setForm({ ...form, forzar: e.target.checked })} />
           Registrar aunque nest-api no pueda validarla (solo pruebas)
         </label>
+        <div className="border-t border-slate-100 pt-3">
+          <p className="text-xs text-slate-500 mb-2">
+            O cree la póliza en Sis2000 sin recibos, con el tomador y el RIF de arriba. Los certificados se incluyen desde
+            Certificados y cada viaje pagado genera su recibo.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+            <label className="label">Plan
+              <input className={inputCls} value={nueva.cplan} onChange={(e) => setNueva({ ...nueva, cplan: e.target.value })} />
+            </label>
+            <label className="label">Vigencia desde
+              <input type="date" className={inputCls} value={nueva.fdesde} onChange={(e) => setNueva({ ...nueva, fdesde: e.target.value })} />
+            </label>
+            <label className="label">Hasta
+              <input type="date" className={inputCls} value={nueva.fhasta} onChange={(e) => setNueva({ ...nueva, fhasta: e.target.value })} />
+            </label>
+            <button
+              className="btn-secondary"
+              disabled={busy === 'crear' || !nueva.cplan.trim() || !form.tomadorRif.trim()}
+              onClick={() => void crear()}
+            >
+              {busy === 'crear' ? <Spinner size="sm" /> : Ic.shield()} Crear póliza en Sis2000
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="card p-4 space-y-3">
@@ -163,6 +219,14 @@ export function PolizaRecibosTab({ pushNotif }: { pushNotif: PushNotif }) {
               <option value="ANULADO">Anulado</option>
             </select>
           </label>
+          <button
+            className="btn-secondary"
+            disabled={busy === 'sync'}
+            onClick={() => void sincronizar()}
+            title="Reintenta en Sis2000 los recibos cobrados por sincronizar o con error (FLOTA_RECIBO_REAL=1)"
+          >
+            {busy === 'sync' ? <Spinner size="sm" /> : Ic.shield()} Sincronizar pendientes
+          </button>
           <button className="btn-secondary" disabled={busy === 'csv'} onClick={() => void csv()}>
             {busy === 'csv' ? <Spinner size="sm" /> : Ic.rows()} Exportar CSV
           </button>

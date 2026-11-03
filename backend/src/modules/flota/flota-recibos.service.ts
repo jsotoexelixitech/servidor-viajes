@@ -9,7 +9,7 @@ import { FlotaPoliza } from './entities/flota-poliza.entity';
 import { FlotaCertificado } from './entities/flota-certificado.entity';
 import { EstadoViajeFlota, FlotaViaje } from './entities/flota-viaje.entity';
 import { FlotaService } from './flota.service';
-import { FlotaSis2000Client } from './flota-sis2000.client';
+import { FlotaSis2000Client, monedaSis2000 } from './flota-sis2000.client';
 import { ModalidadCobro, ModoCierre } from './entities/flota-config.entity';
 
 const num = (v: unknown): number => {
@@ -45,6 +45,18 @@ export interface RegistrarPolizaInput {
   tomadorRif?: string;
   /** Registrar aunque nest-api no pueda validarla (p. ej. en el 120 sin módulo flota). */
   forzar?: boolean;
+}
+
+export interface CrearPolizaFlotaInput {
+  tomadorRif: string;
+  tomadorNombre?: string;
+  cplan: string;
+  cramo?: number;
+  fdesde: string;
+  fhasta: string;
+  cproductor?: number;
+  csucur?: number;
+  moneda?: string;
 }
 
 /**
@@ -137,6 +149,45 @@ export class FlotaRecibosService {
       }, usuario);
     }
     return { poliza: guardada, validada, validacion };
+  }
+
+  /**
+   * Opción (a): crea la póliza de flota en Sis2000 (nest-api POST /api/flota/polizas → sp_flota_crear_poliza_nexus,
+   * sin recibos) y la registra igual que la opción (b), con origen CREADA.
+   */
+  async crearPoliza(tenantId: string, dto: CrearPolizaFlotaInput, usuario?: string) {
+    if (!this.sis2000.conexionConfigurada()) {
+      throw new BadRequestException('Sin conexión a nest-api (NEST_API_URL / NEST_API_KEY): no se puede crear la póliza.');
+    }
+    let creada: { cnpoliza: string; cpoliza: string | null; data: unknown };
+    try {
+      creada = await this.sis2000.crearPoliza({
+        cramo: dto.cramo ?? 18,
+        cplan: dto.cplan.trim(),
+        cidTomador: dto.tomadorRif.trim().toUpperCase(),
+        cproductor: dto.cproductor,
+        csucur: dto.csucur,
+        cmoneda: monedaSis2000(dto.moneda),
+        fdesde: dto.fdesde.slice(0, 10),
+        fhasta: dto.fhasta.slice(0, 10),
+        cusuario: this.sis2000.cusuario(),
+      });
+    } catch (err) {
+      const e = err as { response?: { status?: number; data?: unknown }; message?: string };
+      if (!e.response && err instanceof BadRequestException) throw err;
+      throw new UnprocessableEntityException({
+        message: `nest-api no pudo crear la póliza: ${JSON.stringify(e.response?.data ?? e.message).slice(0, 500)}`,
+        status: e.response?.status ?? null,
+      });
+    }
+    const r = await this.registrarPoliza(
+      tenantId,
+      { cnpoliza: creada.cnpoliza, tomadorNombre: dto.tomadorNombre, tomadorRif: dto.tomadorRif, forzar: true },
+      usuario,
+    );
+    r.poliza.origen = 'CREADA';
+    const poliza = await this.polizaRepo.save(r.poliza);
+    return { ...r, poliza, creada: { cnpoliza: creada.cnpoliza, cpoliza: creada.cpoliza } };
   }
 
   // ── Recibos propios ────────────────────────────────────────────────────────

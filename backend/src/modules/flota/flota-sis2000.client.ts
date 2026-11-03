@@ -19,6 +19,27 @@ export interface ReciboCertificadoPayload {
   cusuario: number;
 }
 
+/** Body de nest-api POST /api/flota/polizas (CrearPolizaFlotaDto). */
+export interface CrearPolizaPayload {
+  cramo: number;
+  cplan: string;
+  cidTomador: string;
+  cproductor?: number;
+  csucur?: number;
+  cmoneda?: string;
+  fdesde: string;
+  fhasta: string;
+  cusuario?: number;
+}
+
+/** Body de nest-api POST /api/flota/polizas/:cnpoliza/certificados (IncluirCertificadoDto). */
+export interface IncluirCertificadoPayload {
+  xplaca: string;
+  conductor: { cid: string; nombre: string };
+  fdesde?: string;
+  cusuario?: number;
+}
+
 export interface ReciboCertificadoResultado {
   cnrecibo: string | null;
   crecibo: string | null;
@@ -128,6 +149,46 @@ export class FlotaSis2000Client {
       yaExistia: Boolean(d?.yaExistia),
       data,
     };
+  }
+
+  /** (a) Crea la póliza de flota en Sis2000 (sp_flota_crear_poliza_nexus), sin recibos. */
+  async crearPoliza(p: CrearPolizaPayload): Promise<{ cnpoliza: string; cpoliza: string | null; data: unknown }> {
+    const { base, apikey } = this.conexion();
+    const { data } = await axios.post(`${base}/api/flota/polizas`, p, {
+      headers: { apikey, 'Content-Type': 'application/json' },
+      timeout: 60000,
+    });
+    const d = (data?.data ?? data) as Record<string, unknown>;
+    const cnpoliza = d?.cnpoliza != null ? String(d.cnpoliza).trim() : '';
+    if (!cnpoliza) throw new BadRequestException(`nest-api no devolvió cnpoliza: ${JSON.stringify(data).slice(0, 300)}`);
+    return { cnpoliza, cpoliza: d?.cpoliza != null ? String(d.cpoliza) : null, data };
+  }
+
+  /** Inclusión del vehículo + conductor como certificado SIN recibo (nest-api manda @generarRecibo = 0). */
+  async incluirCertificado(cnpoliza: string, p: IncluirCertificadoPayload): Promise<{ ccerti: number; data: unknown }> {
+    const { base, apikey } = this.conexion();
+    const { data } = await axios.post(
+      `${base}/api/flota/polizas/${encodeURIComponent(cnpoliza)}/certificados`,
+      { ...p, generarRecibo: false },
+      { headers: { apikey, 'Content-Type': 'application/json' }, timeout: 60000 },
+    );
+    const d = (data?.data ?? data) as Record<string, unknown>;
+    const ccerti = Number(d?.ccerti);
+    if (d?.ccerti == null || !Number.isFinite(ccerti)) {
+      throw new BadRequestException(`nest-api no devolvió ccerti: ${JSON.stringify(data).slice(0, 300)}`);
+    }
+    return { ccerti, data };
+  }
+
+  /** Exclusión del certificado en Sis2000 (no anula recibos ya generados). */
+  async excluirCertificado(cnpoliza: string, ccerti: number, fexclusion?: string): Promise<unknown> {
+    const { base, apikey } = this.conexion();
+    const { data } = await axios.post(
+      `${base}/api/flota/polizas/${encodeURIComponent(cnpoliza)}/certificados/${ccerti}/excluir`,
+      { fexclusion, cusuario: this.cusuario() },
+      { headers: { apikey, 'Content-Type': 'application/json' }, timeout: 60000 },
+    );
+    return data;
   }
 
   async certificadosPoliza(cnpoliza: string): Promise<CertificadoSis2000[]> {

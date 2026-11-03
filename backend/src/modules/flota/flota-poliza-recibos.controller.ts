@@ -8,7 +8,7 @@ import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { Tenant } from '../tenant/entities/tenant.entity';
 import { FiltroRecibos, FlotaRecibosService } from './flota-recibos.service';
 import { FlotaVivoBus } from './flota-vivo.bus';
-import { AnularReciboDto, RegistrarPolizaDto } from './dto/cobro-viaje.dto';
+import { AnularReciboDto, CrearPolizaFlotaDto, RegistrarPolizaDto } from './dto/cobro-viaje.dto';
 
 const filtro = (q: Record<string, string | undefined>): FiltroRecibos => ({
   cnpoliza: q.cnpoliza || undefined,
@@ -46,6 +46,20 @@ export class FlotaPolizaRecibosController {
   async registrar(@CurrentTenant() t: Tenant, @Body() dto: RegistrarPolizaDto) {
     try {
       return await this.svc.registrarPoliza(t.id, dto, t.nombre);
+    } finally {
+      this.bus.bump(t.id);
+    }
+  }
+
+  @Post('poliza/crear')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Crear la póliza de flota en Sis2000 (nest-api → sp_flota_crear_poliza_nexus, sin recibos) y registrarla',
+    description: 'Tomador Ridery, plan y vigencia. Queda como póliza de la flota (origen CREADA). Requiere NEST_API_URL / NEST_API_KEY con scope flota:write.',
+  })
+  async crear(@CurrentTenant() t: Tenant, @Body() dto: CrearPolizaFlotaDto) {
+    try {
+      return await this.svc.crearPoliza(t.id, dto, t.nombre);
     } finally {
       this.bus.bump(t.id);
     }

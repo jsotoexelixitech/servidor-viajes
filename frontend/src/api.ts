@@ -458,6 +458,12 @@ export const flotaApi = {
   poliza: () => api.get<FlotaPolizaActual>('/flota/poliza'),
   registrarPoliza: (data: { cnpoliza: string; tomadorNombre?: string; tomadorRif?: string; forzar?: boolean }) =>
     api.post<{ poliza: FlotaPolizaRegistro; validada: boolean; validacion: Record<string, unknown> }>('/flota/poliza/registrar', data),
+  /** Opción (a): crear la póliza en Sis2000 (nest-api → sp_flota_crear_poliza_nexus, sin recibos) y registrarla. */
+  crearPoliza: (data: { tomadorRif: string; tomadorNombre?: string; cplan: string; fdesde: string; fhasta: string; cramo?: number; moneda?: string }) =>
+    api.post<{ poliza: FlotaPolizaRegistro; validada: boolean; creada: { cnpoliza: string; cpoliza: string | null } }>('/flota/poliza/crear', data),
+  /** Reintenta en Sis2000 los recibos COBRADOS con sync PENDIENTE/ERROR (FLOTA_RECIBO_REAL=1). */
+  sincronizarRecibos: () =>
+    api.post<{ cnpoliza: string; intentados: number; ok: number; error: number }>('/flota/recibos/sincronizar', {}),
   recibos: (q: FiltroRecibos) => api.get<FlotaRecibosRespuesta>('/flota/recibos', { params: q }),
   recibosCsv: (q: FiltroRecibos) => api.get<Blob>('/flota/recibos/csv', { params: q, responseType: 'blob' }),
   anularRecibo: (id: string, motivo: string) => api.post<FlotaRecibo>(`/flota/recibos/${id}/anular`, { motivo }),

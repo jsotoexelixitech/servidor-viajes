@@ -176,6 +176,16 @@ export class FlotaCobroViajeController {
     return this.svc.listarPagos(t.id, limit ? Number(limit) : 100);
   }
 
+  @Post('recibos/sincronizar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Sincronizar pendientes: reintenta en Sis2000 los recibos COBRADOS con sync_sis2000 PENDIENTE/ERROR',
+    description: 'Requiere FLOTA_RECIBO_REAL=1. Idempotente por creferencia VIAJE:<idViaje> (si ya existía, Sis2000 devuelve el mismo recibo).',
+  })
+  sincronizarRecibos(@CurrentTenant() t: Tenant, @Query('limit') limit?: string) {
+    return this.conAviso(t.id, this.svc.sincronizarRecibosPendientes(t.id, limit ? Number(limit) : 100));
+  }
+
   @Post('pagos/:id/reintentar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reintentar el recibo de un pago que quedó en ERROR' })

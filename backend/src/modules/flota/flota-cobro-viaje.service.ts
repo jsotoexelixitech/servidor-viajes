@@ -25,6 +25,12 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000;
 const isoDia = (d: Date) => d.toISOString().slice(0, 10);
 const TOLERANCIA = 0.01;
 
+/** Mensaje legible de un error de axios contra nest-api. */
+const errorNest = (err: unknown): string => {
+  const e = err as { response?: { status?: number; data?: unknown }; message?: string };
+  return `nest-api ${e.response?.status ?? ''}: ${JSON.stringify(e.response?.data ?? e.message ?? 'Error desconocido')}`.slice(0, 1000);
+};
+
 /** V-12.345.678 → V12345678 */
 export function normalizarDoc(doc?: string | null): string | null {
   const s = String(doc ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -171,10 +177,20 @@ export class FlotaCobroViajeService {
 
   async guardarCertificado(tenantId: string, dto: CertificadoDto): Promise<FlotaCertificado> {
     const cnpoliza = dto.cnpoliza?.trim() || (await this.flota.getConfig(tenantId)).cnpoliza;
-    // Sin ccerti: siguiente número de la póliza (numeración Nexus; en Sis2000 se asociará al crear los SP).
-    const ccerti = dto.ccerti ?? num(await this.certRepo.maximum('ccerti', { tenantId, cnpoliza })) + 1;
+    // FLOTA_RECIBO_REAL=1 y certificado nuevo: inclusión en Sis2000 (sin recibo) y se guarda el ccerti REAL devuelto.
+    const incluirReal = this.sis2000.reciboRealActivo() && dto.ccerti == null;
+    let ccerti: number;
+    if (incluirReal) {
+      ccerti = await this.incluirEnSis2000(cnpoliza, dto);
+    } else {
+      // Sin ccerti: siguiente número de la póliza (numeración Nexus, modo sin Sis2000).
+      ccerti = dto.ccerti ?? num(await this.certRepo.maximum('ccerti', { tenantId, cnpoliza })) + 1;
+    }
     const existente = await this.certRepo.findOne({ where: { tenantId, cnpoliza, ccerti } });
-    const fila = existente ?? this.certRepo.create({ tenantId, cnpoliza, ccerti, origen: OrigenCertificado.MANUAL });
+    const fila = existente ?? this.certRepo.create({
+      tenantId, cnpoliza, ccerti, origen: incluirReal ? OrigenCertificado.SIS2000 : OrigenCertificado.MANUAL,
+    });
+    if (incluirReal) fila.origen = OrigenCertificado.SIS2000;
     if (dto.placa !== undefined) fila.placa = dto.placa.trim().toUpperCase() || null;
     if (dto.conductorDoc !== undefined) {
       fila.conductorDoc = dto.conductorDoc.trim() || null;
@@ -188,8 +204,70 @@ export class FlotaCobroViajeService {
   async desactivarCertificado(tenantId: string, id: string) {
     const fila = await this.certRepo.findOne({ where: { id, tenantId } });
     if (!fila) throw new NotFoundException('Certificado no encontrado.');
+    // FLOTA_RECIBO_REAL=1: si el certificado existe en Sis2000, primero se excluye allá (no anula recibos ya generados).
+    if (this.sis2000.reciboRealActivo() && fila.origen === OrigenCertificado.SIS2000 && fila.activo) {
+      try {
+        await this.sis2000.excluirCertificado(fila.cnpoliza, fila.ccerti, isoDia(new Date()));
+      } catch (err) {
+        throw new UnprocessableEntityException(
+          `No se pudo excluir el certificado ${fila.ccerti} en Sis2000: ${errorNest(err)}`,
+        );
+      }
+    }
     fila.activo = false;
     return this.certRepo.save(fila);
+  }
+
+  /** Inclusión del vehículo + conductor en Sis2000 vía nest-api (generarRecibo=false). Devuelve el ccerti real. */
+  private async incluirEnSis2000(cnpoliza: string, dto: CertificadoDto): Promise<number> {
+    const placa = dto.placa?.trim().toUpperCase();
+    const doc = dto.conductorDoc?.trim().toUpperCase();
+    const nombre = dto.conductorNombre?.trim();
+    if (!placa || !doc || !nombre) {
+      throw new BadRequestException('Para incluir el certificado en Sis2000 se requieren placa, conductorDoc y conductorNombre.');
+    }
+    try {
+      const r = await this.sis2000.incluirCertificado(cnpoliza, {
+        xplaca: placa.slice(0, 15),
+        conductor: { cid: doc.slice(0, 20), nombre: nombre.toUpperCase().slice(0, 100) },
+        fdesde: isoDia(new Date()),
+        cusuario: this.sis2000.cusuario(),
+      });
+      return r.ccerti;
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new UnprocessableEntityException(`No se pudo incluir el certificado en Sis2000: ${errorNest(err)}`);
+    }
+  }
+
+  /**
+   * Reintenta en Sis2000 los recibos propios COBRADOS con sync_sis2000 PENDIENTE/ERROR (requiere FLOTA_RECIBO_REAL=1).
+   * Usa el mismo camino que el pago: idempotente por creferencia VIAJE:<idViaje>.
+   */
+  async sincronizarRecibosPendientes(tenantId: string, limit = 100) {
+    if (!this.sis2000.reciboRealActivo()) {
+      throw new BadRequestException('Active FLOTA_RECIBO_REAL=1 para sincronizar recibos con Sis2000.');
+    }
+    const { cnpoliza, recibos } = await this.recibos.listar(
+      tenantId, { estado: 'COBRADO', sync: 'PENDIENTE,ERROR', limit }, 500,
+    );
+    const resultados: { numero: string; idViaje: string; ok: boolean; cnrecibo: string | null; error: string | null }[] = [];
+    for (const rec of recibos) {
+      const pago = rec.pagoId
+        ? await this.pagoRepo.findOne({ where: { id: rec.pagoId, tenantId } })
+        : await this.pagoRepo.findOne({ where: { tenantId, idExterno: rec.idExterno } });
+      const viaje = await this.viajeRepo.findOne({ where: { id: rec.viajeId, tenantId } });
+      if (!pago || !viaje) {
+        resultados.push({ numero: rec.numero, idViaje: rec.idExterno, ok: false, cnrecibo: null, error: 'Sin pago o viaje asociado.' });
+        continue;
+      }
+      pago.intentos += 1;
+      const p = await this.generarRecibo(viaje, pago);
+      const ok = p.estado === EstadoReciboViaje.RECIBO_GENERADO;
+      resultados.push({ numero: rec.numero, idViaje: rec.idExterno, ok, cnrecibo: ok ? p.cnrecibo : null, error: ok ? null : p.error });
+    }
+    const ok = resultados.filter((r) => r.ok).length;
+    return { cnpoliza, intentados: resultados.length, ok, error: resultados.length - ok, resultados };
   }
 
   /** Trae los certificados de la póliza desde Sis2000 (nest-api) y los guarda/actualiza. */
