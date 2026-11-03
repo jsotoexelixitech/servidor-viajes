@@ -35,6 +35,13 @@ export interface CrearPolizaPayload {
 /** Body de nest-api POST /api/flota/polizas/:cnpoliza/certificados (IncluirCertificadoDto). */
 export interface IncluirCertificadoPayload {
   xplaca: string;
+  xsercar?: string;
+  xsermot?: string;
+  cano?: number;
+  cmarca?: number;
+  cmodelo?: number;
+  cversion?: number;
+  xcolor?: string;
   conductor: { cid: string; nombre: string };
   fdesde?: string;
   cusuario?: number;

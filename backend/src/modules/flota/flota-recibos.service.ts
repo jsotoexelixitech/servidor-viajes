@@ -2,6 +2,7 @@ import {
   BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomBytes } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindOptionsWhere, In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { EstadoReciboNexus, FlotaRecibo, SyncSis2000 } from './entities/flota-recibo.entity';
@@ -84,11 +85,94 @@ export class FlotaRecibosService {
 
   async polizaActual(tenantId: string) {
     const cfg = await this.flota.getConfig(tenantId);
-    const [registro, certificados] = await Promise.all([
+    const [encontrada, certificados] = await Promise.all([
       this.polizaRepo.findOne({ where: { tenantId, cnpoliza: cfg.cnpoliza } }),
       this.certRepo.count({ where: { tenantId, cnpoliza: cfg.cnpoliza } }),
     ]);
+    const registro = encontrada ? await this.asegurarToken(encontrada) : null;
     return { cnpoliza: cfg.cnpoliza, cplan: cfg.cplan, registrada: Boolean(registro), registro, certificados };
+  }
+
+  // ── Link público, historial de pólizas, desasociar / activar (presentación) ──
+
+  /** Token del link público /poliza/<token>: 32 caracteres aleatorios (192 bits), nunca el cnpoliza. */
+  async asegurarToken(p: FlotaPoliza): Promise<FlotaPoliza> {
+    if (p.tokenPublico) return p;
+    p.tokenPublico = randomBytes(24).toString('base64url');
+    return this.polizaRepo.save(p);
+  }
+
+  porToken(token: string) {
+    if (!/^[A-Za-z0-9_-]{24,64}$/.test(token || '')) return Promise.resolve(null);
+    return this.polizaRepo.findOne({ where: { tokenPublico: token } });
+  }
+
+  /** Todas las pólizas de la flota (la activa primero) con sus certificados y recibos locales. */
+  async listarPolizas(tenantId: string) {
+    const cfg = await this.flota.getConfig(tenantId);
+    const filas = await this.polizaRepo.find({ where: { tenantId }, order: { activa: 'DESC', creadoEn: 'DESC' }, take: 50 });
+    const out = [];
+    for (const f of filas) {
+      const p = await this.asegurarToken(f);
+      const [certificados, certificadosActivos, recibos] = await Promise.all([
+        this.certRepo.count({ where: { tenantId, cnpoliza: p.cnpoliza } }),
+        this.certRepo.count({ where: { tenantId, cnpoliza: p.cnpoliza, activo: true } }),
+        this.reciboRepo.count({ where: { tenantId, cnpoliza: p.cnpoliza } }),
+      ]);
+      out.push({ ...p, enConfiguracion: p.cnpoliza === cfg.cnpoliza, certificados, certificadosActivos, recibos });
+    }
+    return { cnpolizaConfiguracion: cfg.cnpoliza, polizas: out };
+  }
+
+  /** La configuración de la flota pasa a esta póliza (se versiona; tarifas y cierre se conservan). */
+  private async apuntarConfig(tenantId: string, cnpoliza: string, cplan: string | null, usuario?: string) {
+    const cfg = await this.flota.getConfig(tenantId);
+    if (cfg.cnpoliza === cnpoliza && (!cplan || cfg.cplan === cplan)) return;
+    await this.flota.setConfig(tenantId, {
+      cnpoliza,
+      cplan: cplan ?? cfg.cplan ?? undefined,
+      modalidad: (cfg.modalidad ?? ModalidadCobro.TIEMPO) as 'TIEMPO' | 'KM',
+      tarifa: num(cfg.tarifa),
+      moneda: cfg.moneda,
+      minimoPorViaje: num(cfg.minimoPorViaje),
+      redondearUnidad: cfg.redondearUnidad,
+      modoCierre: (cfg.modoCierre ?? ModoCierre.MANUAL) as 'MANUAL' | 'AUTO',
+      diaCierre: cfg.diaCierre,
+    }, usuario);
+  }
+
+  /**
+   * Desasociar (para pruebas): la póliza queda INACTIVA SOLO de nuestro lado y sale de la configuración
+   * (vuelve a la póliza por defecto del .env). NO borra ni anula nada en Sis2000. Sus certificados y recibos
+   * locales quedan como historial ligados a ella y se puede volver a activar.
+   */
+  async desasociarPoliza(tenantId: string, id: string, usuario?: string) {
+    const p = await this.polizaRepo.findOne({ where: { id, tenantId } });
+    if (!p) throw new NotFoundException('Póliza no encontrada.');
+    p.activa = false;
+    p.desasociadaEn = new Date();
+    const guardada = await this.polizaRepo.save(p);
+    const cfg = await this.flota.getConfig(tenantId);
+    if (cfg.cnpoliza === p.cnpoliza) {
+      const defecto = this.config.get<string>('FLOTA_CNPOLIZA_DEFAULT') || '18-1-1130480881';
+      await this.apuntarConfig(tenantId, defecto, this.config.get<string>('FLOTA_CPLAN_DEFAULT') || null, usuario);
+    }
+    return {
+      poliza: guardada,
+      mensaje: `Póliza ${p.cnpoliza} desasociada en Nexus. En Sis2000 no se borró ni anuló nada.`,
+    };
+  }
+
+  /** Vuelve a dejar activa una póliza anterior (selector de póliza activa). */
+  async activarPoliza(tenantId: string, id: string, usuario?: string) {
+    const p = await this.polizaRepo.findOne({ where: { id, tenantId } });
+    if (!p) throw new NotFoundException('Póliza no encontrada.');
+    await this.polizaRepo.update({ tenantId, activa: true }, { activa: false });
+    p.activa = true;
+    p.desasociadaEn = null;
+    const guardada = await this.asegurarToken(await this.polizaRepo.save(p));
+    await this.apuntarConfig(tenantId, p.cnpoliza, p.cplan, usuario);
+    return { poliza: guardada };
   }
 
   async registrarPoliza(tenantId: string, dto: RegistrarPolizaInput, usuario?: string) {
@@ -131,23 +215,12 @@ export class FlotaRecibosService {
     fila.validacion = validacion;
     fila.activa = true;
     fila.registradoPor = usuario ?? null;
-    const guardada = await this.polizaRepo.save(fila);
+    fila.desasociadaEn = null;
+    if (cplan) fila.cplan = cplan;
+    const guardada = await this.asegurarToken(await this.polizaRepo.save(fila));
 
     // La póliza registrada pasa a ser la de la flota (la configuración se versiona; tarifas y cierre se conservan).
-    const cfg = await this.flota.getConfig(tenantId);
-    if (cfg.cnpoliza !== cnpoliza || (cplan && cfg.cplan !== cplan)) {
-      await this.flota.setConfig(tenantId, {
-        cnpoliza,
-        cplan: cplan ?? cfg.cplan ?? undefined,
-        modalidad: (cfg.modalidad ?? ModalidadCobro.TIEMPO) as 'TIEMPO' | 'KM',
-        tarifa: num(cfg.tarifa),
-        moneda: cfg.moneda,
-        minimoPorViaje: num(cfg.minimoPorViaje),
-        redondearUnidad: cfg.redondearUnidad,
-        modoCierre: (cfg.modoCierre ?? ModoCierre.MANUAL) as 'MANUAL' | 'AUTO',
-        diaCierre: cfg.diaCierre,
-      }, usuario);
-    }
+    await this.apuntarConfig(tenantId, cnpoliza, cplan, usuario);
     return { poliza: guardada, validada, validacion };
   }
 
@@ -186,7 +259,9 @@ export class FlotaRecibosService {
       usuario,
     );
     r.poliza.origen = 'CREADA';
+    r.poliza.cplan = r.poliza.cplan || dto.cplan.trim().toUpperCase();
     const poliza = await this.polizaRepo.save(r.poliza);
+    await this.apuntarConfig(tenantId, poliza.cnpoliza, poliza.cplan, usuario);
     return { ...r, poliza, creada: { cnpoliza: creada.cnpoliza, cpoliza: creada.cpoliza } };
   }
 

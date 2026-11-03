@@ -1,9 +1,11 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
-/** Clasificación de distancia del viaje (Ridery: urbano / extra urbano). */
+/** Clasificación de distancia del viaje (Ridery: urbano / extra urbano / interurbano). */
 export enum ClasificacionDistancia {
   URBANO = 'URBANO',
   EXTRA_URBANO = 'EXTRA_URBANO',
+  /** Viajes entre ciudades. Rango de km propio o `clasificacion` explícita en el evento. */
+  INTERURBANO = 'INTERURBANO',
 }
 
 /**

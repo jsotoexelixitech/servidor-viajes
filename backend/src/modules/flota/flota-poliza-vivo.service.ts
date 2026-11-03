@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
+import { Between, In, IsNull, Repository } from 'typeorm';
 import { EstadoViajeFlota, FlotaViaje } from './entities/flota-viaje.entity';
 import { FlotaCertificado } from './entities/flota-certificado.entity';
 import { EstadoReciboViaje, FlotaPagoViaje } from './entities/flota-pago-viaje.entity';
@@ -280,12 +280,13 @@ export class FlotaPolizaVivoService {
     return mapa;
   }
 
-  async cuadro(tenantId: string, tenantNombre: string, q: { rev?: string; desde?: string; hasta?: string }) {
+  async cuadro(tenantId: string, tenantNombre: string, q: { rev?: string; desde?: string; hasta?: string; cnpoliza?: string }) {
     const rev = this.bus.rev(tenantId);
     if (q.rev && q.rev === rev) return { rev, sinCambios: true as const };
 
     const cfg = await this.flota.getConfig(tenantId);
-    const cnpoliza = cfg.cnpoliza;
+    // Link público (/poliza/<token>) o selector: una póliza concreta; si no, la de la configuración actual.
+    const cnpoliza = q.cnpoliza || cfg.cnpoliza;
     const { desde, hasta } = rangoFechas(q.desde, q.hasta);
     const reciboReal = this.sis2000.reciboRealActivo();
 
@@ -293,7 +294,11 @@ export class FlotaPolizaVivoService {
       this.polizaSis2000(cnpoliza),
       this.certRepo.find({ where: { tenantId, cnpoliza }, order: { ccerti: 'ASC' } }),
       this.viajeRepo.find({
-        where: { tenantId, modoCobro: 'POR_VIAJE', inicio: Between(desde, hasta) },
+        // Solo los viajes de esta póliza (y los antiguos sin póliza anotada), para que al desasociar/crear otra no se mezclen.
+        where: [
+          { tenantId, modoCobro: 'POR_VIAJE', inicio: Between(desde, hasta), cnpoliza },
+          { tenantId, modoCobro: 'POR_VIAJE', inicio: Between(desde, hasta), cnpoliza: IsNull() },
+        ],
         order: { inicio: 'DESC' },
         take: MAX_VIAJES,
       }),
@@ -309,6 +314,7 @@ export class FlotaPolizaVivoService {
       this.polizaRepo ? this.polizaRepo.findOne({ where: { tenantId, cnpoliza } }) : Promise.resolve(null),
     ]);
     const propioPorViaje = new Map(propios.map((r) => [r.viajeId, r]));
+    const planLocal = registro?.cplan ?? (cnpoliza === cfg.cnpoliza ? cfg.cplan : null) ?? null;
     const coberturasCfg = leerCoberturas(this.config.get<string>('FLOTA_COBERTURAS_JSON'));
 
     const ccertisReales = [...new Set(pagos.filter((p) => p.modo === 'REAL' && p.ccerti != null).map((p) => p.ccerti as number))];
@@ -334,7 +340,7 @@ export class FlotaPolizaVivoService {
         estatus: ist ? (ESTATUS_CERT[ist.toUpperCase()] ?? ist) : (c.activo ? 'ACTIVO' : 'INACTIVO'),
         activo: c.activo,
         origen: c.origen,
-        plan: txt(s?.cplan) ?? cfg.cplan ?? null,
+        plan: txt(s?.cplan) ?? planLocal,
         vigenciaDesde: txt(s?.fdesde),
         vigenciaHasta: txt(s?.fhasta),
         recibosSis2000: s?.recibos != null ? num(s.recibos) : null,
@@ -418,7 +424,7 @@ export class FlotaPolizaVivoService {
         cnpoliza: txt(p?.cnpoliza) ?? cnpoliza,
         ramo: this.config.get<string>('FLOTA_RAMO_NOMBRE') || 'AUTOMÓVIL',
         cramo: p?.cramo ?? null,
-        plan: txt(p?.cplan) ?? cfg.cplan ?? null,
+        plan: txt(p?.cplan) ?? planLocal,
         tipoPoliza: tipo ? (TIPO_POLIZA[tipo.toUpperCase()] ?? tipo) : 'COLECTIVA (FLOTA)',
         tipoProducto: 'FLOTA POR USO · COBRO POR VIAJE',
         frecuencia: frec ? (FRECUENCIA[frec.toUpperCase()] ?? frec) : 'POR VIAJE',

@@ -469,7 +469,7 @@ export const flotaApi = {
   anularRecibo: (id: string, motivo: string) => api.post<FlotaRecibo>(`/flota/recibos/${id}/anular`, { motivo }),
 };
 
-export type Clasificacion = 'URBANO' | 'EXTRA_URBANO';
+export type Clasificacion = 'URBANO' | 'EXTRA_URBANO' | 'INTERURBANO';
 export type RedondeoKm = 'NINGUNO' | 'KM_ARRIBA' | 'KM_CERCANO';
 
 export interface FlotaTarifaDistancia {
@@ -690,3 +690,62 @@ export interface FlotaRecibosRespuesta {
   totales: { PENDIENTE: number; COBRADO: number; ANULADO: number; montoCobrado: number; montoPendiente: number };
   recibos: FlotaRecibo[];
 }
+
+// ── Presentación: crear flota por Excel, link público, desasociar / activar póliza ──
+export interface FilaLote {
+  placa: string;
+  cedulaConductor: string;
+  nombreConductor: string;
+  serialCarroceria?: string;
+  serialMotor?: string;
+  anio?: number;
+  marca?: string;
+  modelo?: string;
+  color?: string;
+}
+
+export interface ResultadoFilaLote {
+  fila: number; placa: string; cedula: string; nombre: string;
+  ok: boolean; ccerti: number | null; yaExistia: boolean; origen: 'SIS2000' | 'NEXUS' | null; error: string | null;
+}
+
+export interface ResultadoLote {
+  cnpoliza: string;
+  cnpolizaConfiguracion: string;
+  inclusionSis2000: boolean;
+  total: number; ok: number; fallidos: number;
+  resultados: ResultadoFilaLote[];
+}
+
+export interface FlotaPolizaItem extends FlotaPolizaRegistro {
+  cplan: string | null;
+  tokenPublico: string | null;
+  desasociadaEn: string | null;
+  enConfiguracion: boolean;
+  certificados: number;
+  certificadosActivos: number;
+  recibos: number;
+}
+
+export interface CrearPolizaInput {
+  tomadorRif: string; tomadorNombre?: string; cplan: string; fdesde: string; fhasta: string; cramo?: number; moneda?: string;
+}
+
+export const flotaPresentacionApi = {
+  emitirLote: (data: { cnpoliza?: string; poliza?: CrearPolizaInput; filas: FilaLote[] }) =>
+    api.post<ResultadoLote>('/flota/poliza/emitir-lote', data, { timeout: 180000 }),
+  crearPoliza: (data: CrearPolizaInput) =>
+    api.post<{ poliza: FlotaPolizaItem; creada: { cnpoliza: string; cpoliza: string | null } }>('/flota/poliza/crear', data, { timeout: 120000 }),
+  polizas: () => api.get<{ cnpolizaConfiguracion: string; polizas: FlotaPolizaItem[] }>('/flota/polizas'),
+  desasociar: (id: string) => api.post<{ poliza: FlotaPolizaItem; mensaje: string }>(`/flota/polizas/${id}/desasociar`, {}),
+  activar: (id: string) => api.post<{ poliza: FlotaPolizaItem }>(`/flota/polizas/${id}/activar`, {}),
+};
+
+/** Link público de solo lectura (sin login): /poliza/<token>. */
+export const linkPublicoPoliza = (token: string) => `${window.location.origin}/poliza/${encodeURIComponent(token)}`;
+
+export const publicoApi = {
+  poliza: (token: string, q: { rev?: string; desde?: string; hasta?: string }) =>
+    axios.create({ baseURL: BASE_URL, timeout: 20000 })
+      .get<PolizaVivo | { rev: string; sinCambios: true }>(`/publico/poliza/${encodeURIComponent(token)}`, { params: q }),
+};

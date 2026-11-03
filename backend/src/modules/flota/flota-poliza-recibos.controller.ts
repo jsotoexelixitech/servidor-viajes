@@ -8,7 +8,8 @@ import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { Tenant } from '../tenant/entities/tenant.entity';
 import { FiltroRecibos, FlotaRecibosService } from './flota-recibos.service';
 import { FlotaVivoBus } from './flota-vivo.bus';
-import { AnularReciboDto, CrearPolizaFlotaDto, RegistrarPolizaDto } from './dto/cobro-viaje.dto';
+import { AnularReciboDto, CrearPolizaFlotaDto, EmitirLoteDto, RegistrarPolizaDto } from './dto/cobro-viaje.dto';
+import { FlotaLoteService } from './flota-lote.service';
 
 const filtro = (q: Record<string, string | undefined>): FiltroRecibos => ({
   cnpoliza: q.cnpoliza || undefined,
@@ -29,7 +30,11 @@ const filtro = (q: Record<string, string | undefined>): FiltroRecibos => ({
 @UseGuards(TenantGuard)
 @Controller('flota')
 export class FlotaPolizaRecibosController {
-  constructor(private readonly svc: FlotaRecibosService, private readonly bus: FlotaVivoBus) {}
+  constructor(
+    private readonly svc: FlotaRecibosService,
+    private readonly bus: FlotaVivoBus,
+    private readonly lote: FlotaLoteService,
+  ) {}
 
   @Get('poliza')
   @ApiOperation({ summary: 'Póliza de flota actual (configuración) y su registro en Nexus' })
@@ -60,6 +65,50 @@ export class FlotaPolizaRecibosController {
   async crear(@CurrentTenant() t: Tenant, @Body() dto: CrearPolizaFlotaDto) {
     try {
       return await this.svc.crearPoliza(t.id, dto, t.nombre);
+    } finally {
+      this.bus.bump(t.id);
+    }
+  }
+
+  @Post('poliza/emitir-lote')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Crear la flota desde el Excel: crea la póliza (si no viene cnpoliza) e incluye cada conductor (sin recibo)',
+    description: 'Resultado por fila (ccerti o el mensaje del SP). Idempotente por placa + conductor. La pantalla lo llama fila por fila para la barra de progreso.',
+  })
+  async emitirLote(@CurrentTenant() t: Tenant, @Body() dto: EmitirLoteDto) {
+    try {
+      return await this.lote.emitir(t.id, dto, t.nombre);
+    } finally {
+      this.bus.bump(t.id);
+    }
+  }
+
+  @Get('polizas')
+  @ApiOperation({ summary: 'Pólizas de la flota (activa e historial) con su link público, certificados y recibos locales' })
+  polizas(@CurrentTenant() t: Tenant) {
+    return this.svc.listarPolizas(t.id);
+  }
+
+  @Post('polizas/:id/desasociar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Desasociar la póliza SOLO en Nexus (pruebas): activa=false y sale de la configuración. NO borra ni anula nada en Sis2000',
+  })
+  async desasociar(@CurrentTenant() t: Tenant, @Param('id') id: string) {
+    try {
+      return await this.svc.desasociarPoliza(t.id, id, t.nombre);
+    } finally {
+      this.bus.bump(t.id);
+    }
+  }
+
+  @Post('polizas/:id/activar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Volver a dejar activa una póliza anterior (pasa a la configuración de la flota)' })
+  async activar(@CurrentTenant() t: Tenant, @Param('id') id: string) {
+    try {
+      return await this.svc.activarPoliza(t.id, id, t.nombre);
     } finally {
       this.bus.bump(t.id);
     }

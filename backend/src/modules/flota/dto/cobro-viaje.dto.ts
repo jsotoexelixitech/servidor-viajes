@@ -7,7 +7,8 @@ import {
 
 export const TIPOS_EVENTO = ['INICIO', 'FIN', 'CANCELACION'] as const;
 export type TipoEventoViaje = (typeof TIPOS_EVENTO)[number];
-export const CLASIFICACIONES = ['URBANO', 'EXTRA_URBANO'] as const;
+export const CLASIFICACIONES = ['URBANO', 'EXTRA_URBANO', 'INTERURBANO'] as const;
+export type ClasificacionTxt = (typeof CLASIFICACIONES)[number];
 export const REDONDEOS = ['NINGUNO', 'KM_ARRIBA', 'KM_CERCANO'] as const;
 
 /** Evento de viaje de la plataforma (Ridery) para el cobro por viaje. */
@@ -47,7 +48,7 @@ export class EventoViajeDto {
 
   @ApiPropertyOptional({ enum: CLASIFICACIONES, description: 'Si se omite, se clasifica por los rangos de km configurados.' })
   @IsOptional() @IsIn(CLASIFICACIONES as unknown as string[])
-  clasificacion?: 'URBANO' | 'EXTRA_URBANO';
+  clasificacion?: ClasificacionTxt;
 
   @ApiPropertyOptional({ example: { lat: 10.49, lng: -66.88, direccion: 'Altamira' } })
   @IsOptional() @IsObject()
@@ -92,7 +93,7 @@ export class PagoViajeDto {
 export class TarifaDistanciaDto {
   @ApiProperty({ enum: CLASIFICACIONES })
   @IsIn(CLASIFICACIONES as unknown as string[])
-  clasificacion: 'URBANO' | 'EXTRA_URBANO';
+  clasificacion: ClasificacionTxt;
 
   @ApiPropertyOptional({ example: 'Urbano' })
   @IsOptional() @IsString() @MaxLength(60)
@@ -129,7 +130,7 @@ export class TarifaDistanciaDto {
 
 export class GuardarTarifasDto {
   @ApiProperty({ type: [TarifaDistanciaDto] })
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(2)
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(3)
   @ValidateNested({ each: true }) @Type(() => TarifaDistanciaDto)
   tarifas: TarifaDistanciaDto[];
 }
@@ -141,7 +142,7 @@ export class CotizarDistanciaDto {
 
   @ApiPropertyOptional({ enum: CLASIFICACIONES })
   @IsOptional() @IsIn(CLASIFICACIONES as unknown as string[])
-  clasificacion?: 'URBANO' | 'EXTRA_URBANO';
+  clasificacion?: ClasificacionTxt;
 }
 
 export class CertificadoDto {
@@ -232,4 +233,58 @@ export class AnularReciboDto {
   @ApiProperty({ example: 'Viaje reversado por la plataforma' })
   @IsString() @MaxLength(250)
   motivo: string;
+}
+
+/** Fila del Excel de la flota (una por conductor/vehículo). */
+export class FilaLoteDto {
+  @ApiProperty({ example: 'RD123AA' })
+  @IsString() @MaxLength(15)
+  placa: string;
+
+  @ApiProperty({ example: 'V-31234567' })
+  @IsString() @MaxLength(20)
+  cedulaConductor: string;
+
+  @ApiProperty({ example: 'JOSE PEREZ' })
+  @IsString() @MaxLength(100)
+  nombreConductor: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(30)
+  serialCarroceria?: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(30)
+  serialMotor?: string;
+
+  @ApiPropertyOptional({ example: 2020 }) @IsOptional() @IsInt()
+  anio?: number;
+
+  @ApiPropertyOptional({ description: 'Texto o código Sis2000 (solo un código numérico viaja al SP como @cmarca).' })
+  @IsOptional() @IsString() @MaxLength(40)
+  marca?: string;
+
+  @ApiPropertyOptional({ description: 'Texto o código Sis2000 (solo un código numérico viaja al SP como @cmodelo).' })
+  @IsOptional() @IsString() @MaxLength(40)
+  modelo?: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(30)
+  color?: string;
+}
+
+/**
+ * Emisión de la flota desde el Excel: crea la póliza (si no viene `cnpoliza`) e incluye cada conductor.
+ * Idempotente por placa + conductor: si ya está activo en la póliza no se vuelve a incluir (el SP también lo es).
+ */
+export class EmitirLoteDto {
+  @ApiPropertyOptional({ example: '18-1-0130481032', description: 'Póliza ya creada. Si no viene, se crea con `poliza`.' })
+  @IsOptional() @IsString() @MaxLength(30)
+  cnpoliza?: string;
+
+  @ApiPropertyOptional({ type: CrearPolizaFlotaDto })
+  @IsOptional() @ValidateNested() @Type(() => CrearPolizaFlotaDto)
+  poliza?: CrearPolizaFlotaDto;
+
+  @ApiProperty({ type: [FilaLoteDto] })
+  @IsArray() @ArrayMaxSize(500)
+  @ValidateNested({ each: true }) @Type(() => FilaLoteDto)
+  filas: FilaLoteDto[];
 }

@@ -37,6 +37,22 @@ export class FlotaPoliza {
   @Column({ type: 'boolean', default: true })
   activa: boolean;
 
+  /** Plan Sis2000 con que se creó/registró (RIDERY / RIDER1 / RIDER2). */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  cplan: string | null;
+
+  /**
+   * Token aleatorio largo del link público de solo lectura (/poliza/<token>). El link nunca lleva el cnpoliza crudo.
+   * Se genera la primera vez que se consulta la póliza y no cambia.
+   */
+  @Index('ux_flota_polizas_token', { unique: true, where: 'token_publico IS NOT NULL' })
+  @Column({ name: 'token_publico', type: 'varchar', length: 64, nullable: true })
+  tokenPublico: string | null;
+
+  /** Cuándo se desasoció de nuestro lado (para pruebas; no toca Sis2000). */
+  @Column({ name: 'desasociada_en', type: 'timestamptz', nullable: true })
+  desasociadaEn: Date | null;
+
   @Column({ name: 'registrado_por', type: 'varchar', length: 100, nullable: true })
   registradoPor: string | null;
 

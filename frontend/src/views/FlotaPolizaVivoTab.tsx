@@ -47,7 +47,7 @@ const ESTADO: Record<EstadoReciboVivo, { label: string; cls: string }> = {
   ERROR:     { label: 'PAGADO · RECIBO CON ERROR', cls: 'cr-badge cr-err' },
   ANULADO:   { label: 'ANULADO',   cls: 'cr-badge cr-err' },
 };
-const CLASIF: Record<string, string> = { URBANO: 'URBANO', EXTRA_URBANO: 'EXTRA URBANO' };
+const CLASIF: Record<string, string> = { URBANO: 'URBANO', EXTRA_URBANO: 'EXTRA URBANO', INTERURBANO: 'INTERURBANO' };
 
 /** Estilos del cuadro: los del PDF (style.css de nest-api: Arial, barras grises centradas, tablas 8–10 px) escalados a pantalla. */
 const CSS = `
@@ -89,7 +89,10 @@ const CSS = `
 }
 `;
 
-export function PolizaVivoTab({ pushNotif }: { pushNotif: PushNotif }) {
+type FetchVivo = (q: { rev?: string; desde?: string; hasta?: string }) => Promise<{ data: PolizaVivo | { rev: string; sinCambios: true } }>;
+
+/** `fetcher`: otra fuente del cuadro (link público /poliza/<token>); por defecto, la póliza de la flota con sesión. */
+export function PolizaVivoTab({ pushNotif, fetcher }: { pushNotif: PushNotif; fetcher?: FetchVivo }) {
   const [data, setData] = useState<PolizaVivo | null>(null);
   const [cargando, setCargando] = useState(false);
   const [desde, setDesde] = useState(mesDesde());
@@ -115,7 +118,7 @@ export function PolizaVivoTab({ pushNotif }: { pushNotif: PushNotif }) {
     enVuelo.current = true;
     const full = forzar || Date.now() - ultFull.current > FULL_MS;
     try {
-      const { data: r } = await flotaApi.polizaEnVivo({ rev: full ? undefined : revRef.current, desde, hasta });
+      const { data: r } = await (fetcher ?? flotaApi.polizaEnVivo)({ rev: full ? undefined : revRef.current, desde, hasta });
       setUltima(new Date());
       setErrorConexion(null);
       revRef.current = r.rev;
@@ -140,7 +143,7 @@ export function PolizaVivoTab({ pushNotif }: { pushNotif: PushNotif }) {
       enVuelo.current = false;
       setCargando(false);
     }
-  }, [desde, hasta, pushNotif]);
+  }, [desde, hasta, pushNotif, fetcher]);
 
   // Cambio de rango → recarga completa (y no resalta lo que ya estaba).
   useEffect(() => {

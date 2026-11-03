@@ -52,6 +52,7 @@ export interface TarifaCalculo {
 const NOMBRES: Record<ClasificacionDistancia, string> = {
   [ClasificacionDistancia.URBANO]: 'Urbano',
   [ClasificacionDistancia.EXTRA_URBANO]: 'Extra urbano',
+  [ClasificacionDistancia.INTERURBANO]: 'Interurbano',
 };
 
 /** Monto de un viaje con las tarifas por distancia (función pura, se prueba sola). */
@@ -68,7 +69,7 @@ export function calcularMontoDistancia(
     throw new UnprocessableEntityException(
       clasificacion
         ? `No hay tarifa activa para la clasificación ${clasificacion}.`
-        : `Ningún rango de distancia cubre ${km} km. Revise la clasificación urbano / extra urbano.`,
+        : `Ningún rango de distancia cubre ${km} km. Revise la clasificación urbano / extra urbano / interurbano.`,
     );
   }
   let kmCobrados = km;
@@ -113,7 +114,15 @@ export class FlotaCobroViajeService {
   /** Tarifas guardadas; si la flota no tiene, valores por defecto (no se guardan hasta editar). */
   async getTarifas(tenantId: string): Promise<FlotaTarifaDistancia[]> {
     const rows = await this.tarifaRepo.find({ where: { tenantId }, order: { kmDesde: 'ASC' } });
-    if (rows.length) return rows;
+    // Interurbano (aditivo): si la flota aún no lo tiene, se ofrece INACTIVO para que se parametrice en la pantalla.
+    const interurbano = () => this.tarifaRepo.create({
+      tenantId, clasificacion: ClasificacionDistancia.INTERURBANO, nombre: NOMBRES.INTERURBANO,
+      kmDesde: '80', kmHasta: null, tarifaKm: '0', minimo: '0', redondeo: RedondeoKm.KM_ARRIBA,
+      moneda: rows[0]?.moneda || 'USD', activa: false,
+    });
+    if (rows.length) {
+      return rows.some((r) => r.clasificacion === ClasificacionDistancia.INTERURBANO) ? rows : [...rows, interurbano()];
+    }
     return [
       this.tarifaRepo.create({
         tenantId, clasificacion: ClasificacionDistancia.URBANO, nombre: NOMBRES.URBANO,
@@ -123,6 +132,7 @@ export class FlotaCobroViajeService {
         tenantId, clasificacion: ClasificacionDistancia.EXTRA_URBANO, nombre: NOMBRES.EXTRA_URBANO,
         kmDesde: '20', kmHasta: null, tarifaKm: '0', minimo: '0', redondeo: RedondeoKm.KM_ARRIBA, moneda: 'USD', activa: true,
       }),
+      interurbano(),
     ];
   }
 

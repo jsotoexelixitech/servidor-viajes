@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Notif } from '../types';
 import {
-  flotaApi, FlotaCertificado, FlotaCotizacion, FlotaPagoViaje, FlotaTarifaDistancia, RedondeoKm,
+  flotaApi, Clasificacion, FlotaCertificado, FlotaCotizacion, FlotaPagoViaje, FlotaTarifaDistancia, RedondeoKm,
 } from '../api';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -36,6 +36,7 @@ export function DistanciaTab({ pushNotif }: { pushNotif: PushNotif }) {
   const [rows, setRows] = useState<FlotaTarifaDistancia[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [km, setKm] = useState(9.1);
+  const [clasifCot, setClasifCot] = useState<'' | Clasificacion>('');
   const [cot, setCot] = useState<FlotaCotizacion | null>(null);
 
   const load = useCallback(async () => {
@@ -65,7 +66,7 @@ export function DistanciaTab({ pushNotif }: { pushNotif: PushNotif }) {
   };
 
   const cotizar = async () => {
-    try { const { data } = await flotaApi.cotizarDistancia(km); setCot(data); }
+    try { const { data } = await flotaApi.cotizarDistancia(km, clasifCot || undefined); setCot(data); }
     catch (e) { setCot(null); pushNotif('error', 'No se pudo calcular', errMsg(e)); }
   };
 
@@ -75,7 +76,8 @@ export function DistanciaTab({ pushNotif }: { pushNotif: PushNotif }) {
         <p className="section-title">{Ic.car('w-3.5 h-3.5')} Clasificación de distancia y tarifa por km</p>
         <p className="text-xs text-slate-500">
           Ridery informa el viaje y devolvemos el monto: km × tarifa de su clasificación (o el mínimo). Si Ridery no manda
-          la clasificación, se decide por el rango de km. La tarifa se aplica al viaje completo.
+          la clasificación (URBANO, EXTRA_URBANO o INTERURBANO), se decide por el rango de km. La tarifa se aplica al viaje completo.
+          Para usar Interurbano: actívelo y ajuste el "km hasta" de Extra urbano para que los rangos no se solapen.
         </p>
         {rows.map((r, i) => (
           <div key={r.clasificacion} className="card-inset grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -128,6 +130,12 @@ export function DistanciaTab({ pushNotif }: { pushNotif: PushNotif }) {
           </label>
           <button className="btn-secondary" onClick={() => void cotizar()}>Calcular</button>
         </div>
+        <label className="label mb-0">Clasificación
+          <select className={inputCls} value={clasifCot} onChange={(e) => setClasifCot(e.target.value as '' | Clasificacion)}>
+            <option value="">Automática por rango de km</option>
+            {rows.filter((r) => r.activa).map((r) => <option key={r.clasificacion} value={r.clasificacion}>{r.nombre}</option>)}
+          </select>
+        </label>
         {cot && (
           <>
             <div className="card-inset text-xs space-y-1.5">

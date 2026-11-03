@@ -18,6 +18,8 @@ import { FlotaPolizaVivoService } from './flota-poliza-vivo.service';
 import { FlotaVivoBus } from './flota-vivo.bus';
 import { FlotaRecibosService } from './flota-recibos.service';
 import { FlotaPolizaRecibosController } from './flota-poliza-recibos.controller';
+import { FlotaLoteService } from './flota-lote.service';
+import { FlotaPublicoController } from './flota-publico.controller';
 
 @Module({
   imports: [
@@ -26,8 +28,8 @@ import { FlotaPolizaRecibosController } from './flota-poliza-recibos.controller'
     ]),
     TenantModule,
   ],
-  controllers: [FlotaController, FlotaCobroViajeController, FlotaPolizaRecibosController],
-  providers: [FlotaService, FlotaCobroViajeService, FlotaSis2000Client, FlotaPolizaVivoService, FlotaVivoBus, FlotaRecibosService],
+  controllers: [FlotaController, FlotaCobroViajeController, FlotaPolizaRecibosController, FlotaPublicoController],
+  providers: [FlotaService, FlotaCobroViajeService, FlotaSis2000Client, FlotaPolizaVivoService, FlotaVivoBus, FlotaRecibosService, FlotaLoteService],
   exports: [FlotaService, FlotaCobroViajeService],
 })
 export class FlotaModule {}

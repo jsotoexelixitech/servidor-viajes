@@ -47,6 +47,10 @@ export class FlotaCertificado {
   @Column({ type: 'boolean', default: true })
   activo: boolean;
 
+  /** Datos del vehículo cargados por Excel (serial carrocería/motor, año, marca, modelo, color). */
+  @Column({ type: 'jsonb', nullable: true })
+  vehiculo: Record<string, unknown> | null;
+
   @Column({ type: 'varchar', length: 10, default: OrigenCertificado.MANUAL })
   origen: OrigenCertificado;
 
