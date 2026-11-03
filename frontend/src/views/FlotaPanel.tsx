@@ -4,6 +4,7 @@ import {
   flotaApi, FlotaCierre, FlotaConductorResumen, FlotaConfig, FlotaResumen, FlotaViaje,
 } from '../api';
 import { CertificadosTab, DistanciaTab, RecibosViajeTab } from './FlotaCobroViajeTabs';
+import { PolizaVivoTab } from './FlotaPolizaVivoTab';
 import { KpiCard } from '../components/ui/KpiCard';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -16,9 +17,10 @@ import { useBrand } from '../lib/branding';
  */
 
 type PushNotif = (tipo: Notif['tipo'], titulo: string, msg: string) => void;
-export type SubTab = 'resumen' | 'feed' | 'conductores' | 'cierres' | 'config' | 'distancia' | 'certificados' | 'recibos' | 'simulador';
+export type SubTab = 'poliza' | 'resumen' | 'feed' | 'conductores' | 'cierres' | 'config' | 'distancia' | 'certificados' | 'recibos' | 'simulador';
 
 const SUBTABS: { id: SubTab; label: string; icon: (p?: string) => React.ReactNode }[] = [
+  { id: 'poliza',      label: 'Póliza en vivo',     icon: Ic.shield },
   { id: 'resumen',     label: 'Resumen del mes',    icon: Ic.grid },
   { id: 'feed',        label: 'Viajes en vivo',     icon: Ic.pulse },
   { id: 'conductores', label: 'Conductores',        icon: Ic.users },
@@ -114,6 +116,7 @@ export function FlotaPanel({
         ))}
       </nav>
 
+      {sub === 'poliza'      && <PolizaVivoTab pushNotif={pushNotif} />}
       {sub === 'resumen'     && <ResumenTab periodo={periodo} pushNotif={pushNotif} go={setSub} />}
       {sub === 'feed'        && <FeedTab pushNotif={pushNotif} />}
       {sub === 'conductores' && <ConductoresTab periodo={periodo} pushNotif={pushNotif} />}

@@ -12,6 +12,8 @@ import { FlotaController } from './flota.controller';
 import { FlotaCobroViajeService } from './flota-cobro-viaje.service';
 import { FlotaCobroViajeController } from './flota-cobro-viaje.controller';
 import { FlotaSis2000Client } from './flota-sis2000.client';
+import { FlotaPolizaVivoService } from './flota-poliza-vivo.service';
+import { FlotaVivoBus } from './flota-vivo.bus';
 
 @Module({
   imports: [
@@ -21,7 +23,7 @@ import { FlotaSis2000Client } from './flota-sis2000.client';
     TenantModule,
   ],
   controllers: [FlotaController, FlotaCobroViajeController],
-  providers: [FlotaService, FlotaCobroViajeService, FlotaSis2000Client],
+  providers: [FlotaService, FlotaCobroViajeService, FlotaSis2000Client, FlotaPolizaVivoService, FlotaVivoBus],
   exports: [FlotaService, FlotaCobroViajeService],
 })
 export class FlotaModule {}

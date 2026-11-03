@@ -6,6 +6,8 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { Tenant } from '../tenant/entities/tenant.entity';
 import { FlotaCobroViajeService } from './flota-cobro-viaje.service';
+import { FlotaPolizaVivoService } from './flota-poliza-vivo.service';
+import { FlotaVivoBus } from './flota-vivo.bus';
 import {
   CertificadoDto, CotizarDistanciaDto, EventoViajeDto, GuardarTarifasDto, PagoViajeDto,
 } from './dto/cobro-viaje.dto';
@@ -21,7 +23,20 @@ import {
 @UseGuards(TenantGuard)
 @Controller('flota')
 export class FlotaCobroViajeController {
-  constructor(private readonly svc: FlotaCobroViajeService) {}
+  constructor(
+    private readonly svc: FlotaCobroViajeService,
+    private readonly vivo: FlotaPolizaVivoService,
+    private readonly bus: FlotaVivoBus,
+  ) {}
+
+  /** Avisa a la pantalla "Póliza en vivo" que hubo un cambio (también si falló: recarga y no pasa nada). */
+  private async conAviso<T>(tenantId: string, p: Promise<T>): Promise<T> {
+    try {
+      return await p;
+    } finally {
+      this.bus.bump(tenantId);
+    }
+  }
 
   // ── Plataforma (Ridery) ──
   @Post('viajes/evento')
@@ -52,7 +67,7 @@ export class FlotaCobroViajeController {
     },
   })
   evento(@CurrentTenant() t: Tenant, @Body() dto: EventoViajeDto) {
-    return this.svc.evento(t.id, dto);
+    return this.conAviso(t.id, this.svc.evento(t.id, dto));
   }
 
   @Post('viajes/pago')
@@ -81,7 +96,7 @@ export class FlotaCobroViajeController {
   @ApiResponse({ status: 409, description: 'Viaje no finalizado o ya pagado con otra referencia.' })
   @ApiResponse({ status: 422, description: 'El monto no coincide con el del viaje.' })
   pago(@CurrentTenant() t: Tenant, @Body() dto: PagoViajeDto) {
-    return this.svc.pagar(t.id, dto);
+    return this.conAviso(t.id, this.svc.pagar(t.id, dto));
   }
 
   @Get('viajes/:idViaje/cobro')
@@ -120,20 +135,38 @@ export class FlotaCobroViajeController {
   @Put('certificados')
   @ApiOperation({ summary: 'Crear o actualizar la asociación conductor → certificado (por póliza + ccerti)' })
   guardarCertificado(@CurrentTenant() t: Tenant, @Body() dto: CertificadoDto) {
-    return this.svc.guardarCertificado(t.id, dto);
+    return this.conAviso(t.id, this.svc.guardarCertificado(t.id, dto));
   }
 
   @Delete('certificados/:id')
   @ApiOperation({ summary: 'Desactivar la asociación (no borra nada en Sis2000)' })
   desactivarCertificado(@CurrentTenant() t: Tenant, @Param('id') id: string) {
-    return this.svc.desactivarCertificado(t.id, id);
+    return this.conAviso(t.id, this.svc.desactivarCertificado(t.id, id));
   }
 
   @Post('certificados/sincronizar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Traer los certificados (vhcerti) de la póliza desde Sis2000 vía nest-api' })
   sincronizar(@CurrentTenant() t: Tenant) {
-    return this.svc.sincronizarCertificados(t.id);
+    return this.conAviso(t.id, this.svc.sincronizarCertificados(t.id));
+  }
+
+  // ── Pantalla: póliza en vivo (cuadro-recibo con un recibo por viaje en cada certificado) ──
+  @Get('poliza-en-vivo')
+  @ApiOperation({
+    summary: 'Cuadro-recibo de la póliza de flota en vivo: certificados por conductor y un recibo por viaje',
+    description:
+      'Mismo modelo que el PDF "CUADRO - RECIBO DE PÓLIZA AUTOMOVIL". Cabecera desde nest-api (adpoliza + vhcerti, caché 60 s) ' +
+      'o, si no responde, con la configuración local. `rev`: la última revisión vista; si no hubo cambios responde ' +
+      '{ sinCambios: true } (la pantalla consulta cada pocos segundos). `desde`/`hasta` (YYYY-MM-DD): por defecto el mes en curso.',
+  })
+  polizaEnVivo(
+    @CurrentTenant() t: Tenant,
+    @Query('rev') rev?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    return this.vivo.cuadro(t.id, t.nombre, { rev, desde, hasta });
   }
 
   // ── Pantalla: recibos por viaje ──
@@ -147,6 +180,6 @@ export class FlotaCobroViajeController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reintentar el recibo de un pago que quedó en ERROR' })
   reintentar(@CurrentTenant() t: Tenant, @Param('id') id: string) {
-    return this.svc.reintentarRecibo(t.id, id);
+    return this.conAviso(t.id, this.svc.reintentarRecibo(t.id, id));
   }
 }

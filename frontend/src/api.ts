@@ -451,6 +451,9 @@ export const flotaApi = {
     api.post<{ cnpoliza: string; leidos: number; nuevos: number; actualizados: number }>('/flota/certificados/sincronizar', {}),
   pagos: (limit = 100) => api.get<FlotaPagoViaje[]>(`/flota/pagos?limit=${limit}`),
   reintentarRecibo: (id: string) => api.post(`/flota/pagos/${id}/reintentar`, {}),
+  /** Cuadro-recibo en vivo. Con `rev` igual a la última vista responde { sinCambios: true }. */
+  polizaEnVivo: (q: { rev?: string; desde?: string; hasta?: string }) =>
+    api.get<PolizaVivo | { rev: string; sinCambios: true }>('/flota/poliza-en-vivo', { params: q }),
 };
 
 export type Clasificacion = 'URBANO' | 'EXTRA_URBANO';
@@ -524,4 +527,84 @@ export interface FlotaPagoViaje {
   error: string | null;
   intentos: number;
   creadoEn: string;
+}
+
+// ── Póliza en vivo (cuadro-recibo con un recibo por viaje en cada certificado) ──
+export type EstadoReciboVivo = 'EN_CURSO' | 'PENDIENTE' | 'PAGADO' | 'ERROR';
+
+export interface ReciboVivo {
+  idViaje: string;
+  nRecibo: string | null;
+  crecibo: string | null;
+  tipo: string;
+  clasificacion: string | null;
+  km: number | null;
+  minutos: number | null;
+  desde: string;
+  hasta: string | null;
+  fechaCobro: string | null;
+  moneda: string;
+  prima: number;
+  estado: EstadoReciboVivo;
+  estadoRecibo: 'RECIBO_SIMULADO' | 'RECIBO_GENERADO' | 'ERROR' | null;
+  modo: 'SIMULADO' | 'REAL' | null;
+  referencia: string | null;
+  metodo: string | null;
+  error: string | null;
+  estadoSis2000: string | null;
+}
+
+export interface TotalesVivo {
+  viajes: number;
+  enCurso: number;
+  cancelados: number;
+  km: number;
+  pagados: number;
+  primasCobradas: number;
+  primasPendientes: number;
+  recibosError: number;
+}
+
+export interface CoberturaVivo { nombre: string; suma: number | null; prima: number }
+
+export interface CertificadoVivo {
+  ccerti: number | null;
+  placa: string | null;
+  conductorDoc: string | null;
+  conductorNombre: string | null;
+  estatus: string;
+  activo: boolean;
+  origen: string;
+  plan: string | null;
+  vigenciaDesde: string | null;
+  vigenciaHasta: string | null;
+  recibosSis2000: number | null;
+  ultimoMovimiento: string | null;
+  totales: TotalesVivo;
+  coberturas: CoberturaVivo[];
+  recibos: ReciboVivo[];
+}
+
+export interface PolizaVivo {
+  rev: string;
+  sinCambios: false;
+  generadoEn: string;
+  rango: { desde: string; hasta: string };
+  fuente: 'SIS2000' | 'LOCAL';
+  sis2000: { ok: boolean; error: string | null; consultadoEn: string };
+  reciboReal: boolean;
+  truncado: boolean;
+  titulo: string;
+  empresa: { nombre: string; sudeaseg: string; capitalSuscrito: string; capitalPagado: string };
+  tomador: { nombre: string; rif: string | null; asegurado: string; rifAsegurado: string | null };
+  poliza: {
+    cnpoliza: string; ramo: string; cramo: string | number | null; plan: string | null; tipoPoliza: string; tipoProducto: string;
+    frecuencia: string; moneda: string; estatus: string; vigenciaDesde: string | null; vigenciaHasta: string | null;
+    fechaEmision: string | null; periodo: string | null; sucursal: string | null; intermediario: string | null;
+    canal: string | null; polizaRel: string | null;
+  };
+  moneda: string;
+  totales: TotalesVivo & { certificados: number; conductoresConViajes: number };
+  coberturas: CoberturaVivo[];
+  certificados: CertificadoVivo[];
 }

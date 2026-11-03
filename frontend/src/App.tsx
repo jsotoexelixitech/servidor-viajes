@@ -577,7 +577,7 @@ export default function App() {
           )}
 
           {tab === 'flota' && apiKeySet && (
-            <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} subInicial={directoMode ? 'distancia' : undefined} />
+            <FlotaPanel pushNotif={pushNotif} demoOn={demoOn} tenantNombre={tenantNombreConectado} subInicial={directoMode ? 'poliza' : undefined} />
           )}
           {tab === 'flota' && !apiKeySet && ssoMode && <SsoEstado loading={apiKeyLoading} error={ssoError} />}
           {tab === 'flota' && !apiKeySet && !ssoMode && !apikeyMode && (

@@ -33,6 +33,45 @@ export interface CertificadoSis2000 {
   cid_asegurado: string | null;
   xasegurado: string | null;
   istatcer: string | null;
+  cplan?: string | null;
+  fdesde?: string | null;
+  fhasta?: string | null;
+  /** Cantidad de recibos (adrecibos) del certificado. */
+  recibos?: number | null;
+}
+
+/** Cabecera de la póliza (adpoliza, último período) según nest-api GET /api/flota/polizas/:cnpoliza. */
+export interface PolizaSis2000 {
+  cpoliza?: string | number | null;
+  cnpoliza: string;
+  cramo?: number | string | null;
+  cplan?: string | null;
+  fanopol?: number | null;
+  fmespol?: number | null;
+  itipopol?: string | null;
+  ifrecuencia?: string | null;
+  cmoneda?: string | null;
+  istatpol?: string | null;
+  fdesde?: string | null;
+  fhasta?: string | null;
+  casegurado?: string | number | null;
+  ctenedor?: string | number | null;
+  cproductor?: string | number | null;
+}
+
+/** Recibo de un certificado (adrecibos) según nest-api GET …/certificados/:ccerti/recibos. */
+export interface ReciboSis2000 {
+  crecibo: string | number;
+  cnrecibo: string | null;
+  ccerti: number;
+  itiporec: string | null;
+  iestadorec: string | null;
+  fdesde: string | null;
+  fhasta: string | null;
+  mprimabruta: number | null;
+  mprimabrutaext: number | null;
+  cmoneda: string | null;
+  fingreso: string | null;
 }
 
 /** Sis2000 usa '$' y 'Bs'; la plataforma manda ISO (USD/VES). */
@@ -92,12 +131,33 @@ export class FlotaSis2000Client {
   }
 
   async certificadosPoliza(cnpoliza: string): Promise<CertificadoSis2000[]> {
+    return (await this.polizaFlota(cnpoliza, 30000)).certificados;
+  }
+
+  /** ¿Hay conexión con nest-api? Sin ella la póliza en vivo usa solo los datos locales. */
+  conexionConfigurada(): boolean {
+    return Boolean(this.config.get<string>('NEST_API_URL') && this.config.get<string>('NEST_API_KEY'));
+  }
+
+  /** Póliza de flota real (adpoliza + vhcerti) desde nest-api. Solo lectura. */
+  async polizaFlota(
+    cnpoliza: string,
+    timeout = 8000,
+  ): Promise<{ poliza: PolizaSis2000 | null; certificados: CertificadoSis2000[] }> {
     const { base, apikey } = this.conexion();
     const { data } = await axios.get(`${base}/api/flota/polizas/${encodeURIComponent(cnpoliza)}`, {
       headers: { apikey },
-      timeout: 30000,
+      timeout,
     });
-    const d = (data?.data ?? data) as { certificados?: CertificadoSis2000[] };
-    return Array.isArray(d?.certificados) ? d.certificados : [];
+    const d = (data?.data ?? data) as { poliza?: PolizaSis2000; certificados?: CertificadoSis2000[] };
+    return { poliza: d?.poliza ?? null, certificados: Array.isArray(d?.certificados) ? d.certificados : [] };
+  }
+
+  /** Recibos reales (adrecibos) de un certificado. Solo lectura. */
+  async recibosCertificado(cnpoliza: string, ccerti: number, timeout = 8000): Promise<ReciboSis2000[]> {
+    const { base, apikey } = this.conexion();
+    const { data } = await axios.get(`${base}${this.rutaRecibo(cnpoliza, ccerti)}`, { headers: { apikey }, timeout });
+    const d = (data?.data ?? data) as { recibos?: ReciboSis2000[] };
+    return Array.isArray(d?.recibos) ? d.recibos : [];
   }
 }
