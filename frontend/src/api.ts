@@ -444,7 +444,7 @@ export const flotaApi = {
   cotizarDistancia: (km: number, clasificacion?: Clasificacion) =>
     api.post<FlotaCotizacion>('/flota/tarifas-distancia/cotizar', { km, ...(clasificacion ? { clasificacion } : {}) }),
   certificados: () => api.get<FlotaCertificado[]>('/flota/certificados'),
-  guardarCertificado: (data: { cnpoliza?: string; ccerti: number; placa?: string; conductorDoc?: string; conductorNombre?: string; activo?: boolean }) =>
+  guardarCertificado: (data: { cnpoliza?: string; ccerti?: number; placa?: string; conductorDoc?: string; conductorNombre?: string; activo?: boolean }) =>
     api.put<FlotaCertificado>('/flota/certificados', data),
   desactivarCertificado: (id: string) => api.delete<FlotaCertificado>(`/flota/certificados/${id}`),
   sincronizarCertificados: () =>
@@ -454,6 +454,13 @@ export const flotaApi = {
   /** Cuadro-recibo en vivo. Con `rev` igual a la última vista responde { sinCambios: true }. */
   polizaEnVivo: (q: { rev?: string; desde?: string; hasta?: string }) =>
     api.get<PolizaVivo | { rev: string; sinCambios: true }>('/flota/poliza-en-vivo', { params: q }),
+  // Fase 1: póliza registrada y recibos propios (Nexus)
+  poliza: () => api.get<FlotaPolizaActual>('/flota/poliza'),
+  registrarPoliza: (data: { cnpoliza: string; tomadorNombre?: string; tomadorRif?: string; forzar?: boolean }) =>
+    api.post<{ poliza: FlotaPolizaRegistro; validada: boolean; validacion: Record<string, unknown> }>('/flota/poliza/registrar', data),
+  recibos: (q: FiltroRecibos) => api.get<FlotaRecibosRespuesta>('/flota/recibos', { params: q }),
+  recibosCsv: (q: FiltroRecibos) => api.get<Blob>('/flota/recibos/csv', { params: q, responseType: 'blob' }),
+  anularRecibo: (id: string, motivo: string) => api.post<FlotaRecibo>(`/flota/recibos/${id}/anular`, { motivo }),
 };
 
 export type Clasificacion = 'URBANO' | 'EXTRA_URBANO';
@@ -521,8 +528,8 @@ export interface FlotaPagoViaje {
   fechaPago: string;
   cnpoliza: string | null;
   ccerti: number | null;
-  estado: 'RECIBO_SIMULADO' | 'RECIBO_GENERADO' | 'ERROR';
-  modo: 'SIMULADO' | 'REAL';
+  estado: 'RECIBO_SIMULADO' | 'RECIBO_GENERADO' | 'RECIBO_NEXUS' | 'ERROR';
+  modo: 'SIMULADO' | 'REAL' | 'NEXUS';
   cnrecibo: string | null;
   error: string | null;
   intentos: number;
@@ -530,7 +537,7 @@ export interface FlotaPagoViaje {
 }
 
 // ── Póliza en vivo (cuadro-recibo con un recibo por viaje en cada certificado) ──
-export type EstadoReciboVivo = 'EN_CURSO' | 'PENDIENTE' | 'PAGADO' | 'ERROR';
+export type EstadoReciboVivo = 'EN_CURSO' | 'PENDIENTE' | 'PAGADO' | 'ERROR' | 'ANULADO';
 
 export interface ReciboVivo {
   idViaje: string;
@@ -546,8 +553,11 @@ export interface ReciboVivo {
   moneda: string;
   prima: number;
   estado: EstadoReciboVivo;
-  estadoRecibo: 'RECIBO_SIMULADO' | 'RECIBO_GENERADO' | 'ERROR' | null;
-  modo: 'SIMULADO' | 'REAL' | null;
+  estadoRecibo: 'RECIBO_SIMULADO' | 'RECIBO_GENERADO' | 'RECIBO_NEXUS' | 'ERROR' | null;
+  modo: 'SIMULADO' | 'REAL' | 'NEXUS' | null;
+  estadoNexus: EstadoReciboNexus | null;
+  syncSis2000: SyncSis2000 | null;
+  cnreciboSis2000: string | null;
   referencia: string | null;
   metodo: string | null;
   error: string | null;
@@ -563,6 +573,7 @@ export interface TotalesVivo {
   primasCobradas: number;
   primasPendientes: number;
   recibosError: number;
+  anulados?: number;
 }
 
 export interface CoberturaVivo { nombre: string; suma: number | null; prima: number }
@@ -593,6 +604,8 @@ export interface PolizaVivo {
   fuente: 'SIS2000' | 'LOCAL';
   sis2000: { ok: boolean; error: string | null; consultadoEn: string };
   reciboReal: boolean;
+  recibosFuente?: 'SIS2000' | 'NEXUS';
+  polizaRegistrada?: { validada: boolean; registradaEn: string } | null;
   truncado: boolean;
   titulo: string;
   empresa: { nombre: string; sudeaseg: string; capitalSuscrito: string; capitalPagado: string };
@@ -607,4 +620,67 @@ export interface PolizaVivo {
   totales: TotalesVivo & { certificados: number; conductoresConViajes: number };
   coberturas: CoberturaVivo[];
   certificados: CertificadoVivo[];
+}
+
+// ── Fase 1 Ridery: póliza registrada y recibos propios (Nexus) ──
+export type EstadoReciboNexus = 'PENDIENTE' | 'COBRADO' | 'ANULADO';
+export type SyncSis2000 = 'PENDIENTE' | 'OK' | 'ERROR';
+
+export interface FlotaPolizaRegistro {
+  id: string;
+  cnpoliza: string;
+  origen: string;
+  tomadorNombre: string | null;
+  tomadorRif: string | null;
+  validada: boolean;
+  validacion: Record<string, unknown> | null;
+  activa: boolean;
+  creadoEn: string;
+}
+
+export interface FlotaPolizaActual {
+  cnpoliza: string;
+  cplan: string | null;
+  registrada: boolean;
+  registro: FlotaPolizaRegistro | null;
+  certificados: number;
+}
+
+export interface FlotaRecibo {
+  id: string;
+  numero: string;
+  cnpoliza: string;
+  ccerti: number;
+  secuencia: number;
+  idExterno: string;
+  monto: string;
+  moneda: string;
+  fdesde: string;
+  fhasta: string | null;
+  estado: EstadoReciboNexus;
+  fechaCobro: string | null;
+  referenciaPago: string | null;
+  metodoPago: string | null;
+  motivoAnulacion: string | null;
+  syncSis2000: SyncSis2000;
+  cnreciboSis2000: string | null;
+  syncError: string | null;
+}
+
+export interface FiltroRecibos {
+  cnpoliza?: string;
+  ccerti?: number | string;
+  desde?: string;
+  hasta?: string;
+  estado?: string;
+  sync?: string;
+  limit?: number;
+}
+
+export interface FlotaRecibosRespuesta {
+  cnpoliza: string;
+  total: number;
+  devueltos: number;
+  totales: { PENDIENTE: number; COBRADO: number; ANULADO: number; montoCobrado: number; montoPendiente: number };
+  recibos: FlotaRecibo[];
 }

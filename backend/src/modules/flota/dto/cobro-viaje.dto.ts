@@ -149,9 +149,9 @@ export class CertificadoDto {
   @IsOptional() @IsString() @MaxLength(30)
   cnpoliza?: string;
 
-  @ApiProperty({ example: 3 })
-  @IsInt() @Min(0)
-  ccerti: number;
+  @ApiPropertyOptional({ example: 3, description: "Si no viene, se asigna el siguiente número de la póliza (numeración Nexus)." })
+  @IsOptional() @IsInt() @Min(0)
+  ccerti?: number;
 
   @ApiPropertyOptional({ example: 'AB123CD' })
   @IsOptional() @IsString() @MaxLength(20)
@@ -168,4 +168,29 @@ export class CertificadoDto {
   @ApiPropertyOptional({ example: true })
   @IsOptional() @IsBoolean()
   activo?: boolean;
+}
+
+/** Fase 1: registrar una póliza de flota YA emitida por La Mundial (se valida con nest-api; no escribe en Sis2000). */
+export class RegistrarPolizaDto {
+  @ApiProperty({ example: '18-1-1130480881' })
+  @IsString() @MaxLength(30)
+  cnpoliza: string;
+
+  @ApiPropertyOptional({ example: 'Ridery Venezuela, C.A.' })
+  @IsOptional() @IsString() @MaxLength(150)
+  tomadorNombre?: string;
+
+  @ApiPropertyOptional({ example: 'J-12345678-9' })
+  @IsOptional() @IsString() @MaxLength(20)
+  tomadorRif?: string;
+
+  @ApiPropertyOptional({ example: false, description: 'Registrar aunque nest-api no pueda validarla.' })
+  @IsOptional() @IsBoolean()
+  forzar?: boolean;
+}
+
+export class AnularReciboDto {
+  @ApiProperty({ example: 'Viaje reversado por la plataforma' })
+  @IsString() @MaxLength(250)
+  motivo: string;
 }

@@ -132,3 +132,17 @@ describe('helpers', () => {
     expect(hasta.getMonth()).toBe(desde.getMonth());
   });
 });
+
+describe('reciboDeViaje con recibo propio (Fase 1)', () => {
+  const v = viaje('V9', {});
+  const propio = { viajeId: 'V9', numero: `RDY-${POLIZA}-1-000007`, estado: 'COBRADO', syncSis2000: 'PENDIENTE', cnreciboSis2000: null, ccerti: 1 } as never;
+  it('muestra el número propio RDY-… en lugar del SIM-…', () => {
+    const r = reciboDeViaje(v, pago('V9', {}), undefined, propio);
+    expect(r).toMatchObject({ nRecibo: `RDY-${POLIZA}-1-000007`, estadoNexus: 'COBRADO', syncSis2000: 'PENDIENTE', estado: 'PAGADO' });
+  });
+  it('pendiente de pago ya trae número; anulado se marca ANULADO', () => {
+    expect(reciboDeViaje(v, null, undefined, { ...(propio as object), estado: 'PENDIENTE' } as never))
+      .toMatchObject({ nRecibo: `RDY-${POLIZA}-1-000007`, estado: 'PENDIENTE', modo: 'NEXUS' });
+    expect(reciboDeViaje(v, null, undefined, { ...(propio as object), estado: 'ANULADO' } as never)?.estado).toBe('ANULADO');
+  });
+});

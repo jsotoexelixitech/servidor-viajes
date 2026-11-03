@@ -14,6 +14,7 @@ import {
 } from './dto/cobro-viaje.dto';
 import { FlotaService } from './flota.service';
 import { FlotaSis2000Client, monedaSis2000, ReciboCertificadoPayload } from './flota-sis2000.client';
+import { FlotaRecibosService } from './flota-recibos.service';
 
 const num = (v: unknown): number => {
   const n = Number(v ?? 0);
@@ -98,6 +99,7 @@ export class FlotaCobroViajeService {
     @InjectRepository(FlotaPagoViaje) private readonly pagoRepo: Repository<FlotaPagoViaje>,
     private readonly flota: FlotaService,
     private readonly sis2000: FlotaSis2000Client,
+    private readonly recibos: FlotaRecibosService,
   ) {}
 
   // ── Tarifas por distancia (mantenimiento) ────────────────────────────────
@@ -169,8 +171,10 @@ export class FlotaCobroViajeService {
 
   async guardarCertificado(tenantId: string, dto: CertificadoDto): Promise<FlotaCertificado> {
     const cnpoliza = dto.cnpoliza?.trim() || (await this.flota.getConfig(tenantId)).cnpoliza;
-    const existente = await this.certRepo.findOne({ where: { tenantId, cnpoliza, ccerti: dto.ccerti } });
-    const fila = existente ?? this.certRepo.create({ tenantId, cnpoliza, ccerti: dto.ccerti, origen: OrigenCertificado.MANUAL });
+    // Sin ccerti: siguiente número de la póliza (numeración Nexus; en Sis2000 se asociará al crear los SP).
+    const ccerti = dto.ccerti ?? num(await this.certRepo.maximum('ccerti', { tenantId, cnpoliza })) + 1;
+    const existente = await this.certRepo.findOne({ where: { tenantId, cnpoliza, ccerti } });
+    const fila = existente ?? this.certRepo.create({ tenantId, cnpoliza, ccerti, origen: OrigenCertificado.MANUAL });
     if (dto.placa !== undefined) fila.placa = dto.placa.trim().toUpperCase() || null;
     if (dto.conductorDoc !== undefined) {
       fila.conductorDoc = dto.conductorDoc.trim() || null;
@@ -325,7 +329,11 @@ export class FlotaCobroViajeService {
     viaje.destino = dto.destino ?? viaje.destino ?? null;
     viaje.estado = EstadoViajeFlota.FINALIZADO;
     viaje.estadoPago = calc.monto > 0 ? 'PENDIENTE' : null;
-    return this.respuesta(await this.viajeRepo.save(viaje), false);
+    const guardado = await this.viajeRepo.save(viaje);
+    // Recibo propio PENDIENTE (Fase 1). Si falla, el FIN no se cae: el recibo se crea al pagar.
+    await this.recibos.asegurarRecibo(guardado).catch((err: Error) =>
+      this.logger.warn(`Recibo PENDIENTE del viaje ${guardado.idExterno}: ${err.message}`));
+    return this.respuesta(guardado, false);
   }
 
   private async cancelacion(tenantId: string, dto: EventoViajeDto) {
@@ -361,7 +369,16 @@ export class FlotaCobroViajeService {
     const viaje = await this.buscar(tenantId, idViaje);
     if (!viaje) throw new NotFoundException(`Viaje ${idViaje} no existe.`);
     const pago = await this.pagoRepo.findOne({ where: { tenantId, idExterno: idViaje } });
-    return { ...this.respuesta(viaje, false), pago: pago ? this.resumenPago(pago) : null };
+    const recibo = await this.recibos.porViaje(tenantId, idViaje);
+    return {
+      ...this.respuesta(viaje, false),
+      pago: pago ? this.resumenPago(pago) : null,
+      reciboNexus: recibo ? {
+        id: recibo.id, numero: recibo.numero, estado: recibo.estado, monto: num(recibo.monto), moneda: recibo.moneda,
+        fechaCobro: recibo.fechaCobro, referenciaPago: recibo.referenciaPago,
+        syncSis2000: recibo.syncSis2000, cnreciboSis2000: recibo.cnreciboSis2000,
+      } : null,
+    };
   }
 
   respuesta(v: FlotaViaje, duplicado: boolean) {
@@ -435,7 +452,7 @@ export class FlotaCobroViajeService {
         metodo: dto.metodo ?? null,
         fechaPago: dto.fechaPago ? new Date(dto.fechaPago) : new Date(),
         estado: EstadoReciboViaje.ERROR,
-        modo: 'SIMULADO',
+        modo: 'NEXUS',
         intentos: 1,
       });
       try {
@@ -493,7 +510,7 @@ export class FlotaCobroViajeService {
     pago.cnpoliza = cnpoliza;
     pago.ccerti = ccerti;
     const real = this.sis2000.reciboRealActivo();
-    pago.modo = real ? 'REAL' : 'SIMULADO';
+    pago.modo = real ? 'REAL' : 'NEXUS';
 
     if (ccerti == null) {
       pago.estado = EstadoReciboViaje.ERROR;
@@ -518,6 +535,19 @@ export class FlotaCobroViajeService {
     };
     pago.payload = { ...payload, endpoint: `POST ${this.sis2000.rutaRecibo(cnpoliza, ccerti)}` };
 
+    // Recibo propio (flota_recibos): COBRADO con la referencia del pago, en ambos modos.
+    if (!pago.id) pago = await this.pagoRepo.save(pago);
+    let propio: Awaited<ReturnType<FlotaRecibosService['cobrar']>> = null;
+    try {
+      propio = await this.recibos.cobrar(viaje, {
+        id: pago.id, referencia: pago.referencia, metodo: pago.metodo, fechaPago: pago.fechaPago, monto: pago.monto, moneda: pago.moneda,
+      });
+    } catch (err) {
+      pago.estado = EstadoReciboViaje.ERROR;
+      pago.error = `Recibo Nexus: ${(err as Error).message}`.slice(0, 2000);
+      return this.pagoRepo.save(pago);
+    }
+
     if (real) {
       try {
         const r = await this.sis2000.crearReciboCertificado(payload);
@@ -526,18 +556,27 @@ export class FlotaCobroViajeService {
         pago.crecibo = r.crecibo;
         pago.respuesta = { yaExistia: r.yaExistia, respuesta: r.data as Record<string, unknown> };
         pago.error = null;
+        if (propio) await this.recibos.marcarSync(propio, true, { cnrecibo: r.cnrecibo, crecibo: r.crecibo });
       } catch (err) {
         const e = err as { response?: { status?: number; data?: unknown }; message?: string };
         pago.estado = EstadoReciboViaje.ERROR;
         pago.error = `nest-api ${e.response?.status ?? ''}: ${JSON.stringify(e.response?.data ?? e.message ?? 'Error desconocido')}`.slice(0, 2000);
         pago.respuesta = { status: e.response?.status ?? null };
         this.logger.warn(`Recibo por viaje ${viaje.idExterno} falló: ${pago.error}`);
+        if (propio) await this.recibos.marcarSync(propio, false, { error: pago.error });
       }
+    } else if (!propio) {
+      pago.estado = EstadoReciboViaje.ERROR;
+      pago.error = `No se pudo numerar el recibo del viaje ${viaje.idExterno} (sin monto o sin certificado).`;
     } else {
-      pago.estado = EstadoReciboViaje.RECIBO_SIMULADO;
-      pago.cnrecibo = `SIM-${isoDia(new Date()).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+      // Fase 1: número propio de Nexus (flota_recibos); queda sync_sis2000=PENDIENTE hasta que existan los SP.
+      pago.estado = EstadoReciboViaje.RECIBO_NEXUS;
+      pago.cnrecibo = propio.numero;
       pago.crecibo = null;
-      pago.respuesta = { simulado: true, nota: 'No se llamó a Sis2000 (FLOTA_RECIBO_REAL=0).' };
+      pago.respuesta = {
+        nexus: true, reciboId: propio.id, syncSis2000: propio.syncSis2000,
+        nota: 'Recibo propio de Nexus, pendiente de sincronizar con Sis2000 (FLOTA_RECIBO_REAL=0).',
+      };
       pago.error = null;
     }
     return this.pagoRepo.save(pago);

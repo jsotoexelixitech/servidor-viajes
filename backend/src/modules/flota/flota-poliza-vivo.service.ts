@@ -10,6 +10,8 @@ import {
   CertificadoSis2000, FlotaSis2000Client, PolizaSis2000, ReciboSis2000,
 } from './flota-sis2000.client';
 import { FlotaVivoBus } from './flota-vivo.bus';
+import { EstadoReciboNexus, FlotaRecibo } from './entities/flota-recibo.entity';
+import { FlotaPoliza } from './entities/flota-poliza.entity';
 
 /**
  * "Póliza en vivo": el cuadro-recibo de la póliza de flota (mismo modelo que el PDF
@@ -45,11 +47,11 @@ export const monedaLabel = (m?: string | null): string => {
 };
 
 /** Estado del recibo de un viaje en la vista (lo que ve operación). */
-export type EstadoReciboVivo = 'EN_CURSO' | 'PENDIENTE' | 'PAGADO' | 'ERROR';
+export type EstadoReciboVivo = 'EN_CURSO' | 'PENDIENTE' | 'PAGADO' | 'ERROR' | 'ANULADO';
 
 export interface ReciboVivo {
   idViaje: string;
-  /** N° de recibo: real de Sis2000 (FLOTA_RECIBO_REAL=1) o SIM-… (simulado). null = viaje sin pago todavía. */
+  /** N° de recibo: propio de Nexus (RDY-…, nace al finalizar el viaje), real de Sis2000 (FLOTA_RECIBO_REAL=1) o SIM-… (histórico). */
   nRecibo: string | null;
   crecibo: string | null;
   tipo: string;
@@ -64,7 +66,12 @@ export interface ReciboVivo {
   estado: EstadoReciboVivo;
   /** RECIBO_SIMULADO / RECIBO_GENERADO / ERROR (lo que pasó al generar el recibo). */
   estadoRecibo: EstadoReciboViaje | null;
-  modo: 'SIMULADO' | 'REAL' | null;
+  modo: 'SIMULADO' | 'REAL' | 'NEXUS' | null;
+  /** Recibo propio (flota_recibos): PENDIENTE / COBRADO / ANULADO. */
+  estadoNexus: EstadoReciboNexus | null;
+  /** Subida a Sis2000 del recibo propio: PENDIENTE / OK / ERROR. */
+  syncSis2000: string | null;
+  cnreciboSis2000: string | null;
   referencia: string | null;
   metodo: string | null;
   error: string | null;
@@ -81,6 +88,8 @@ export interface TotalesVivo {
   primasCobradas: number;
   primasPendientes: number;
   recibosError: number;
+  /** Recibos propios anulados (no suman primas). */
+  anulados: number;
 }
 
 export interface CertificadoVivo {
@@ -130,14 +139,15 @@ export function leerCoberturas(raw?: string | null): CoberturaConfig[] {
 }
 
 const totalesVacios = (): TotalesVivo => ({
-  viajes: 0, enCurso: 0, cancelados: 0, km: 0, pagados: 0, primasCobradas: 0, primasPendientes: 0, recibosError: 0,
+  viajes: 0, enCurso: 0, cancelados: 0, km: 0, pagados: 0, primasCobradas: 0, primasPendientes: 0, recibosError: 0, anulados: 0,
 });
 
-function sumar(t: TotalesVivo, v: FlotaViaje, pago?: FlotaPagoViaje | null) {
+function sumar(t: TotalesVivo, v: FlotaViaje, pago?: FlotaPagoViaje | null, propio?: FlotaRecibo | null) {
   if (v.estado === EstadoViajeFlota.CANCELADO) { t.cancelados += 1; return; }
   if (v.estado === EstadoViajeFlota.INICIADO) { t.enCurso += 1; return; }
   t.viajes += 1;
   t.km = r3(t.km + num(v.km));
+  if (propio?.estado === EstadoReciboNexus.ANULADO) { t.anulados += 1; return; }
   if (pago) {
     t.pagados += 1;
     t.primasCobradas = r2(t.primasCobradas + num(pago.monto));
@@ -152,17 +162,20 @@ export function reciboDeViaje(
   v: FlotaViaje,
   pago: FlotaPagoViaje | null | undefined,
   sis2000?: Map<string, ReciboSis2000>,
+  propio?: FlotaRecibo | null,
 ): ReciboVivo | null {
   if (v.estado === EstadoViajeFlota.CANCELADO) return null;
   let estado: EstadoReciboVivo;
   if (v.estado === EstadoViajeFlota.INICIADO) estado = 'EN_CURSO';
+  else if (propio?.estado === EstadoReciboNexus.ANULADO) estado = 'ANULADO';
   else if (!pago) estado = 'PENDIENTE';
   else if (pago.estado === EstadoReciboViaje.ERROR) estado = 'ERROR';
   else estado = 'PAGADO';
   const real = pago?.cnrecibo ? sis2000?.get(pago.cnrecibo) : undefined;
   return {
     idViaje: v.idExterno,
-    nRecibo: pago?.cnrecibo ?? null,
+    // Con recibo REAL se muestra el de Sis2000; si no, el propio de Nexus (o el SIM-… histórico).
+    nRecibo: (pago?.modo === 'REAL' ? pago.cnrecibo : null) ?? propio?.numero ?? pago?.cnrecibo ?? null,
     crecibo: pago?.crecibo ?? (real ? String(real.crecibo) : null),
     tipo: 'POR VIAJE',
     clasificacion: v.clasificacion,
@@ -175,7 +188,10 @@ export function reciboDeViaje(
     prima: pago ? num(pago.monto) : (v.estado === EstadoViajeFlota.FINALIZADO ? num(v.costo) : num(v.montoEstimado)),
     estado,
     estadoRecibo: pago?.estado ?? null,
-    modo: pago?.modo ?? null,
+    modo: pago?.modo ?? (propio ? 'NEXUS' : null),
+    estadoNexus: propio?.estado ?? null,
+    syncSis2000: propio?.syncSis2000 ?? null,
+    cnreciboSis2000: propio?.cnreciboSis2000 ?? null,
     referencia: pago?.referencia ?? null,
     metodo: pago?.metodo ?? null,
     error: pago?.error ?? null,
@@ -216,6 +232,8 @@ export class FlotaPolizaVivoService {
     private readonly sis2000: FlotaSis2000Client,
     private readonly bus: FlotaVivoBus,
     private readonly config: ConfigService,
+    @InjectRepository(FlotaRecibo) private readonly reciboRepo?: Repository<FlotaRecibo>,
+    @InjectRepository(FlotaPoliza) private readonly polizaRepo?: Repository<FlotaPoliza>,
   ) {}
 
   /** Póliza real desde nest-api, con caché de 60 s (también del error) para no golpear Sis2000 en cada consulta. */
@@ -284,6 +302,13 @@ export class FlotaPolizaVivoService {
       ? await this.pagoRepo.find({ where: { tenantId, viajeId: In(viajes.map((v) => v.id)) } })
       : [];
     const pagoPorViaje = new Map(pagos.map((p) => [p.viajeId, p]));
+    const [propios, registro] = await Promise.all([
+      viajes.length && this.reciboRepo
+        ? this.reciboRepo.find({ where: { tenantId, viajeId: In(viajes.map((v) => v.id)) } })
+        : Promise.resolve([] as FlotaRecibo[]),
+      this.polizaRepo ? this.polizaRepo.findOne({ where: { tenantId, cnpoliza } }) : Promise.resolve(null),
+    ]);
+    const propioPorViaje = new Map(propios.map((r) => [r.viajeId, r]));
     const coberturasCfg = leerCoberturas(this.config.get<string>('FLOTA_COBERTURAS_JSON'));
 
     const ccertisReales = [...new Set(pagos.filter((p) => p.modo === 'REAL' && p.ccerti != null).map((p) => p.ccerti as number))];
@@ -333,7 +358,8 @@ export class FlotaPolizaVivoService {
     const total = totalesVacios();
     for (const v of viajes) {
       const pago = pagoPorViaje.get(v.id) ?? null;
-      const ccerti = pago?.ccerti ?? v.ccerti;
+      const propio = propioPorViaje.get(v.id) ?? null;
+      const ccerti = pago?.ccerti ?? propio?.ccerti ?? v.ccerti;
       let cert = ccerti != null ? certs.get(String(ccerti)) : undefined;
       if (!cert && ccerti != null) {
         cert = nuevoCert(ccerti, { placa: v.placa, conductorDoc: v.conductorDoc, conductorNombre: v.conductorNombre, estatus: 'NO ASOCIADO', activo: false, origen: '—' });
@@ -341,11 +367,11 @@ export class FlotaPolizaVivoService {
       }
       const destino = cert ?? sinCert;
       if (!destino.conductorNombre && v.conductorNombre) destino.conductorNombre = v.conductorNombre;
-      sumar(destino.totales, v, pago);
-      sumar(total, v, pago);
-      const mov = new Date(pago?.actualizadoEn ?? v.fin ?? v.inicio);
+      sumar(destino.totales, v, pago, propio);
+      sumar(total, v, pago, propio);
+      const mov = new Date(propio?.actualizadoEn ?? pago?.actualizadoEn ?? v.fin ?? v.inicio);
       if (!destino.ultimoMovimiento || mov > destino.ultimoMovimiento) destino.ultimoMovimiento = mov;
-      const rec = reciboDeViaje(v, pago, recibosSis);
+      const rec = reciboDeViaje(v, pago, recibosSis, propio);
       if (rec) destino.recibos.push(rec);
     }
 
@@ -371,6 +397,9 @@ export class FlotaPolizaVivoService {
       fuente: sis.ok ? 'SIS2000' : 'LOCAL',
       sis2000: { ok: sis.ok, error: sis.error, consultadoEn: new Date(sis.en) },
       reciboReal,
+      /** De dónde salen los números de recibo: Sis2000 (FLOTA_RECIBO_REAL=1) o Nexus (propios, pendientes de sincronizar). */
+      recibosFuente: reciboReal ? 'SIS2000' : 'NEXUS',
+      polizaRegistrada: registro ? { validada: registro.validada, registradaEn: registro.creadoEn } : null,
       truncado: viajes.length >= MAX_VIAJES,
       titulo: 'CUADRO - RECIBO DE PÓLIZA AUTOMÓVIL',
       empresa: {
@@ -380,10 +409,10 @@ export class FlotaPolizaVivoService {
         capitalPagado: this.config.get<string>('FLOTA_CAPITAL_PAGADO') || this.config.get<string>('FLOTA_CAPITAL_SUSCRITO') || '70.000.000,00',
       },
       tomador: {
-        nombre: this.config.get<string>('FLOTA_TOMADOR_NOMBRE') || tenantNombre,
-        rif: this.config.get<string>('FLOTA_TOMADOR_RIF') || (p?.ctenedor != null ? String(p.ctenedor) : null),
-        asegurado: this.config.get<string>('FLOTA_TOMADOR_NOMBRE') || tenantNombre,
-        rifAsegurado: this.config.get<string>('FLOTA_TOMADOR_RIF') || (p?.casegurado != null ? String(p.casegurado) : null),
+        nombre: registro?.tomadorNombre || this.config.get<string>('FLOTA_TOMADOR_NOMBRE') || tenantNombre,
+        rif: registro?.tomadorRif || this.config.get<string>('FLOTA_TOMADOR_RIF') || (p?.ctenedor != null ? String(p.ctenedor) : null),
+        asegurado: registro?.tomadorNombre || this.config.get<string>('FLOTA_TOMADOR_NOMBRE') || tenantNombre,
+        rifAsegurado: registro?.tomadorRif || this.config.get<string>('FLOTA_TOMADOR_RIF') || (p?.casegurado != null ? String(p.casegurado) : null),
       },
       poliza: {
         cnpoliza: txt(p?.cnpoliza) ?? cnpoliza,

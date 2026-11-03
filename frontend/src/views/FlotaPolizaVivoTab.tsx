@@ -45,6 +45,7 @@ const ESTADO: Record<EstadoReciboVivo, { label: string; cls: string }> = {
   PENDIENTE: { label: 'POR COBRAR', cls: 'cr-badge cr-warn' },
   EN_CURSO:  { label: 'EN CURSO',  cls: 'cr-badge cr-info' },
   ERROR:     { label: 'PAGADO · RECIBO CON ERROR', cls: 'cr-badge cr-err' },
+  ANULADO:   { label: 'ANULADO',   cls: 'cr-badge cr-err' },
 };
 const CLASIF: Record<string, string> = { URBANO: 'URBANO', EXTRA_URBANO: 'EXTRA URBANO' };
 
@@ -244,7 +245,7 @@ export function PolizaVivoTab({ pushNotif }: { pushNotif: PushNotif }) {
           Póliza: {data.fuente === 'SIS2000' ? 'Sis2000 (nest-api)' : 'datos locales'}
         </span>
         <span className={`badge ${data.reciboReal ? 'badge-green' : 'badge-blue'}`}>
-          Recibos: {data.reciboReal ? 'reales (Sis2000)' : 'simulados (SIM-…)'}
+          Recibos: {data.reciboReal ? 'reales (Sis2000)' : 'Nexus (pendiente de sincronizar con Sis2000)'}
         </span>
         {data.fuente === 'LOCAL' && data.sis2000.error && (
           <span className="text-slate-500 self-center" title={data.sis2000.error}>Sis2000 no respondió: se muestran los datos locales.</span>
@@ -410,7 +411,7 @@ export function PolizaVivoTab({ pushNotif }: { pushNotif: PushNotif }) {
                         <tbody>
                           {filas.map((r) => (
                             <tr key={r.idViaje} className={nuevos.has(claveRecibo(r)) ? 'cr-flash' : ''}>
-                              <td className="font-mono">{r.nRecibo ?? '—'}{r.modo === 'SIMULADO' && r.nRecibo && <span className="text-slate-400"> (sim.)</span>}</td>
+                              <td className="font-mono">{r.nRecibo ?? '—'}{r.modo === 'SIMULADO' && r.nRecibo && <span className="text-slate-400"> (sim.)</span>}{r.syncSis2000 && r.modo !== 'REAL' && <span className="block text-[9.5px] text-slate-500">Sis2000: {r.syncSis2000 === 'OK' ? (r.cnreciboSis2000 ?? 'OK') : r.syncSis2000 === 'ERROR' ? 'error al subir' : 'por sincronizar'}</span>}</td>
                               <td>{r.tipo}</td>
                               <td className="font-mono">{r.idViaje}</td>
                               <td>{r.clasificacion ? (CLASIF[r.clasificacion] ?? r.clasificacion) : '—'}</td>
@@ -461,7 +462,7 @@ export function PolizaVivoTab({ pushNotif }: { pushNotif: PushNotif }) {
             si los hubiere, y demás documentos que formen parte del contrato de seguros, accediendo a nuestra página web
             www.lamundialdeseguros.com. Cada viaje informado por la plataforma genera su recibo de prima sobre el certificado
             del conductor. La Mundial de Seguros, C.A, Inscrita en la Superintendencia de la Actividad Aseguradora Bajo El No.{data.empresa.sudeaseg}.
-            {!data.reciboReal && ' Documento de prueba: los recibos SIM-… son simulados y no existen en Sis2000.'}
+            {!data.reciboReal && ' Los recibos RDY-… están registrados en Nexus y pendientes de sincronizar con Sis2000.'}
           </div>
         </div>
       </div>

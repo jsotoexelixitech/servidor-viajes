@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { calcularMontoDistancia, FlotaCobroViajeService, normalizarDoc } from './flota-cobro-viaje.service';
 import { FlotaSis2000Client } from './flota-sis2000.client';
 import { FlotaService } from './flota.service';
+import { FlotaRecibosService } from './flota-recibos.service';
 
 /** Repositorio en memoria (solo lo que usa el servicio). */
 function fakeRepo<T extends Record<string, unknown>>() {
@@ -13,6 +14,10 @@ function fakeRepo<T extends Record<string, unknown>>() {
     create: (d: Partial<T>) => ({ ...d }) as T,
     findOne: async ({ where }: { where: Record<string, unknown> }) => rows.find((r) => match(r, where)) ?? null,
     find: async ({ where }: { where: Record<string, unknown> }) => rows.filter((r) => match(r, where)),
+    maximum: async (col: string, where: Record<string, unknown>) => {
+      const v = rows.filter((r) => match(r, where)).map((r) => Number(r[col]));
+      return v.length ? Math.max(...v) : null;
+    },
     save: async (e: T) => {
       if (!e.id) {
         if (e.idExterno && rows.some((r) => r.tenantId === e.tenantId && r.idExterno === e.idExterno)) {
@@ -49,8 +54,10 @@ function setup(real = false) {
     crearReciboCertificado,
   } as unknown as FlotaSis2000Client;
   // tarifaRepo.find con order: el fake ignora el orden (ya vienen ordenadas).
-  const svc = new FlotaCobroViajeService(viajes as never, tarifas as never, certs as never, pagos as never, flota, sis2000);
-  return { svc, viajes, pagos, crearReciboCertificado };
+  const recibosRepo = fakeRepo();
+  const recibos = new FlotaRecibosService(recibosRepo as never, fakeRepo() as never, certs as never, flota, sis2000, { get: () => undefined } as never);
+  const svc = new FlotaCobroViajeService(viajes as never, tarifas as never, certs as never, pagos as never, flota, sis2000, recibos);
+  return { svc, viajes, pagos, crearReciboCertificado, recibosRepo, recibos };
 }
 
 describe('calcularMontoDistancia', () => {
@@ -112,19 +119,46 @@ describe('FlotaCobroViajeService', () => {
     await expect(svc.pagar(T, { idViaje: 'RDY-1', monto: 2, referencia: 'P1' })).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
-  it('pago genera recibo SIMULADO sobre el certificado; repetido devuelve lo mismo; otra referencia → 409', async () => {
-    const { svc, crearReciboCertificado } = setup(false);
+  it('FIN crea el recibo propio PENDIENTE con numeración correlativa por certificado', async () => {
+    const { svc, recibosRepo } = setup(false);
+    await svc.evento(T, inicio);
+    await svc.evento(T, fin);
+    await svc.evento(T, { ...inicio, idViaje: 'RDY-9' });
+    await svc.evento(T, { ...fin, idViaje: 'RDY-9' });
+    expect(recibosRepo.rows.map((r) => [r.numero, r.estado, r.syncSis2000])).toEqual([
+      [`RDY-${POLIZA}-3-000001`, 'PENDIENTE', 'PENDIENTE'],
+      [`RDY-${POLIZA}-3-000002`, 'PENDIENTE', 'PENDIENTE'],
+    ]);
+    expect((await svc.estadoCobro(T, 'RDY-9')).reciboNexus).toMatchObject({ numero: `RDY-${POLIZA}-3-000002`, estado: 'PENDIENTE' });
+  });
+
+  it('anular recibo: requiere motivo y luego el pago del viaje queda en ERROR', async () => {
+    const { svc, recibosRepo, recibos } = setup(false);
+    await svc.evento(T, inicio);
+    await svc.evento(T, fin);
+    const id = recibosRepo.rows[0].id as string;
+    await expect(recibos.anular(T, id, ' ')).rejects.toThrow();
+    expect((await recibos.anular(T, id, 'Reverso')).estado).toBe('ANULADO');
+    const p = await svc.pagar(T, { idViaje: 'RDY-1', monto: 1, referencia: 'P1' });
+    expect(p.pago.recibo.estado).toBe('ERROR');
+  });
+
+  it('pago deja el recibo propio COBRADO (RDY-…, sync PENDIENTE); repetido devuelve lo mismo; otra referencia → 409', async () => {
+    const { svc, crearReciboCertificado, recibosRepo } = setup(false);
     await svc.evento(T, inicio);
     await svc.evento(T, fin);
     const p = await svc.pagar(T, { idViaje: 'RDY-1', monto: 1, referencia: 'P1' });
-    expect(p.pago.recibo).toMatchObject({ estado: 'RECIBO_SIMULADO', modo: 'SIMULADO', cnpoliza: POLIZA, ccerti: 3 });
+    expect(p.pago.recibo).toMatchObject({
+      estado: 'RECIBO_NEXUS', modo: 'NEXUS', cnpoliza: POLIZA, ccerti: 3, cnrecibo: `RDY-${POLIZA}-3-000001`,
+    });
+    expect(recibosRepo.rows[0]).toMatchObject({ estado: 'COBRADO', referenciaPago: 'P1', syncSis2000: 'PENDIENTE' });
     expect(crearReciboCertificado).not.toHaveBeenCalled();
     expect((await svc.pagar(T, { idViaje: 'RDY-1', monto: 1, referencia: 'P1' })).duplicado).toBe(true);
     await expect(svc.pagar(T, { idViaje: 'RDY-1', monto: 1, referencia: 'P2' })).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('pago REAL llama a nest-api con el certificado del conductor', async () => {
-    const { svc, crearReciboCertificado } = setup(true);
+    const { svc, crearReciboCertificado, recibosRepo } = setup(true);
     await svc.evento(T, inicio);
     await svc.evento(T, fin);
     const p = await svc.pagar(T, { idViaje: 'RDY-1', monto: 1, moneda: 'USD', referencia: 'P1' });
@@ -132,6 +166,7 @@ describe('FlotaCobroViajeService', () => {
       cnpoliza: POLIZA, ccerti: 3, mprima: 1, cmoneda: '$', fdesde: '2026-11-01', fhasta: '2026-11-01', creferencia: 'VIAJE:RDY-1',
     }));
     expect(p.pago.recibo).toMatchObject({ estado: 'RECIBO_GENERADO', cnrecibo: '18-998877' });
+    expect(recibosRepo.rows[0]).toMatchObject({ estado: 'COBRADO', syncSis2000: 'OK', cnreciboSis2000: '18-998877' });
   });
 
   it('sin certificado el pago se registra y el recibo queda en ERROR', async () => {

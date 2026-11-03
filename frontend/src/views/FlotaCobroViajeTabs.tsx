@@ -160,13 +160,13 @@ export function CertificadosTab({ pushNotif }: { pushNotif: PushNotif }) {
   useEffect(() => { void load(); }, [load]);
 
   const guardar = async () => {
-    if (form.ccerti === '') return;
+    // Sin número: Nexus asigna el siguiente certificado de la póliza.
     setBusy('guardar');
     try {
       await flotaApi.guardarCertificado({
-        ccerti: Number(form.ccerti), placa: form.placa, conductorDoc: form.conductorDoc, conductorNombre: form.conductorNombre, activo: true,
+        ccerti: form.ccerti === '' ? undefined : Number(form.ccerti), placa: form.placa, conductorDoc: form.conductorDoc, conductorNombre: form.conductorNombre, activo: true,
       });
-      pushNotif('success', 'Certificado guardado', `Certificado ${form.ccerti}`);
+      pushNotif('success', 'Certificado guardado', `Certificado ${form.ccerti || 'nuevo (número automático)'}`);
       setForm({ ccerti: '', placa: '', conductorDoc: '', conductorNombre: '' });
       await load();
     } catch (e) { pushNotif('error', 'No se pudo guardar', errMsg(e)); } finally { setBusy(null); }
@@ -200,11 +200,11 @@ export function CertificadosTab({ pushNotif }: { pushNotif: PushNotif }) {
           El recibo de cada viaje se genera sobre el certificado del conductor. Se busca primero por cédula y, si no, por placa.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
-          <label className="label">Certificado<input type="number" min={0} className={inputCls} value={form.ccerti} onChange={(e) => setForm({ ...form, ccerti: e.target.value })} /></label>
+          <label className="label">Certificado<input type="number" min={0} className={inputCls} placeholder="auto" value={form.ccerti} onChange={(e) => setForm({ ...form, ccerti: e.target.value })} /></label>
           <label className="label">Placa<input className={inputCls} value={form.placa} onChange={(e) => setForm({ ...form, placa: e.target.value })} /></label>
           <label className="label">Cédula del conductor<input className={inputCls} value={form.conductorDoc} onChange={(e) => setForm({ ...form, conductorDoc: e.target.value })} /></label>
           <label className="label">Nombre<input className={inputCls} value={form.conductorNombre} onChange={(e) => setForm({ ...form, conductorNombre: e.target.value })} /></label>
-          <button className="btn-primary" disabled={busy === 'guardar' || form.ccerti === ''} onClick={() => void guardar()}>
+          <button className="btn-primary" disabled={busy === 'guardar'} onClick={() => void guardar()}>
             {busy === 'guardar' ? <Spinner size="sm" /> : Ic.plus()} Guardar
           </button>
         </div>
@@ -244,6 +244,7 @@ export function CertificadosTab({ pushNotif }: { pushNotif: PushNotif }) {
 const ESTADO_RECIBO: Record<FlotaPagoViaje['estado'], { cls: string; label: string }> = {
   RECIBO_SIMULADO: { cls: 'badge badge-blue', label: 'Simulado' },
   RECIBO_GENERADO: { cls: 'badge badge-green', label: 'Generado' },
+  RECIBO_NEXUS: { cls: 'badge badge-blue', label: 'Nexus · por sincronizar' },
   ERROR: { cls: 'badge badge-red', label: 'Error' },
 };
 

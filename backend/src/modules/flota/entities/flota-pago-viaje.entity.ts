@@ -3,6 +3,8 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 export enum EstadoReciboViaje {
   RECIBO_SIMULADO = 'RECIBO_SIMULADO',
   RECIBO_GENERADO = 'RECIBO_GENERADO',
+  /** Recibo propio de Nexus (flota_recibos, RDY-…), pendiente de sincronizar con Sis2000. */
+  RECIBO_NEXUS = 'RECIBO_NEXUS',
   /** El pago quedó registrado pero el recibo falló (sin certificado, nest-api caído, SP pendiente…). Se reintenta. */
   ERROR = 'ERROR',
 }
@@ -52,11 +54,12 @@ export class FlotaPagoViaje {
   @Column({ type: 'varchar', length: 20 })
   estado: EstadoReciboViaje;
 
-  /** SIMULADO (no toca Sis2000) o REAL (nest-api). */
+  /** NEXUS (recibo propio, no toca Sis2000), REAL (nest-api) o SIMULADO (histórico, antes de la Fase 1). */
   @Column({ type: 'varchar', length: 10 })
-  modo: 'SIMULADO' | 'REAL';
+  modo: 'SIMULADO' | 'REAL' | 'NEXUS';
 
-  @Column({ type: 'varchar', length: 30, nullable: true })
+  /** N° de recibo: Sis2000 (REAL), propio RDY-… (NEXUS) o SIM-… (histórico). */
+  @Column({ type: 'varchar', length: 60, nullable: true })
   cnrecibo: string | null;
 
   @Column({ type: 'varchar', length: 30, nullable: true })

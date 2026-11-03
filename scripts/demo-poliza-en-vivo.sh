@@ -11,7 +11,8 @@
 #   CERT1=1 DOC1=V-12345678 PLACA1=AB123CD NOMBRE1="José Pérez"      conductor 1 → certificado 1
 #   CERT2=2 DOC2=V-20123456 PLACA2=CD456EF NOMBRE2="María González"  conductor 2 → certificado 2
 #
-# Solo en modo SIMULADO: si backend/.env tiene FLOTA_RECIBO_REAL=1 se detiene (generaría recibos reales en Sis2000).
+# Recibos propios de Nexus (RDY-<póliza>-<cert>-<seq>, Fase 1). Si backend/.env tiene FLOTA_RECIBO_REAL=1 se detiene
+# (generaría recibos reales en Sis2000).
 set -euo pipefail
 
 BASE="${BASE:-http://127.0.0.1:3096/api}"
@@ -94,3 +95,7 @@ echo "  $id INICIO (queda EN CURSO)"
 
 echo "▶ Resumen de la póliza en vivo:"
 api GET /flota/poliza-en-vivo | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const o=JSON.parse(s);console.log("  fuente:",o.fuente,"· recibos reales:",o.reciboReal);console.log("  totales:",JSON.stringify(o.totales));for(const c of o.certificados)console.log(`  cert ${c.ccerti??"—"} ${c.conductorNombre??""} ${c.placa??""}: ${c.totales.viajes} viajes, ${c.totales.km} km, cobrado ${c.totales.primasCobradas}, por cobrar ${c.totales.primasPendientes}`)})'
+
+echo "▶ Recibos propios (Nexus) de la póliza — GET /flota/recibos:"
+api GET "/flota/recibos?limit=20" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const o=JSON.parse(s);console.log("  póliza",o.cnpoliza,"· totales:",JSON.stringify(o.totales));for(const r of o.recibos.slice(0,10))console.log(`  ${r.numero} ${r.idExterno} ${r.monto} ${r.moneda} ${r.estado} ref ${r.referenciaPago??"—"} sync ${r.syncSis2000}`)})'
+echo "▶ CSV para La Mundial: GET /flota/recibos/csv → $(api GET /flota/recibos/csv | wc -l) líneas (con cabecera)"
