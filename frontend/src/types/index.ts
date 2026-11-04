@@ -2,7 +2,7 @@
 
 export type Tab =
   | 'dashboard' | 'setup' | 'mapeo' | 'viaje' | 'finalizar'
-  | 'listar' | 'monitor' | 'conductores' | 'cartera' | 'flota';
+  | 'listar' | 'monitor' | 'conductores' | 'cartera' | 'flota' | 'demo';
 
 export type ReqStatus = 'idle' | 'loading' | 'success' | 'error';
 

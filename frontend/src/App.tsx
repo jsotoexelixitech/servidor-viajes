@@ -28,6 +28,7 @@ import { ViajePanel } from './views/ViajePanel';
 import { FinalizarPanel } from './views/FinalizarPanel';
 import { ViajesListPanel } from './views/ViajesListPanel';
 import { MonitorPanel } from './views/MonitorPanel';
+import { DemoPanel } from './views/DemoPanel';
 
 // ─── Nav definition (uses Ic so must be here) ────────────────────────────────
 const NAV: NavItem[] = [
@@ -40,6 +41,7 @@ const NAV: NavItem[] = [
   { id: 'mapeo',       label: 'Configuración', icon: () => Ic.gear(),   section: 'Operación', requiresKey: true },
   { id: 'viaje',       label: 'Iniciar Viaje', icon: () => Ic.play(),   section: 'Operación', requiresKey: true },
   { id: 'finalizar',   label: 'Finalizar',     icon: () => Ic.stop(),   section: 'Operación', requiresKey: true },
+  { id: 'demo',        label: 'Demo en vivo',  icon: () => Ic.sparkle(), section: 'Operación', requiresKey: true },
 
   { id: 'listar',      label: 'Viajes',        icon: () => Ic.rows(),   section: 'Histórico', requiresKey: true },
   { id: 'monitor',     label: 'Monitor',       icon: () => Ic.pulse(),  section: 'Histórico', requiresKey: true, dot: true },
@@ -589,6 +591,11 @@ export default function App() {
               <p className="text-sm font-extrabold text-slate-800 mb-1">Conecta la API Key de la flota</p>
               <p className="text-xs text-slate-600 max-w-sm mx-auto">Flota por uso muestra los viajes y el cobro del mes de la plataforma conectada (ej. Ridery). Pega su API Key arriba y pulsa Conectar.</p>
             </div>
+          )}
+
+          {tab === 'demo' && apiKeySet && <DemoPanel pushNotif={pushNotif} />}
+          {tab === 'demo' && !apiKeySet && (
+            <div className="card p-10 text-center"><p className="text-sm font-bold text-slate-700">Conecta la flota para usar la demo en vivo.</p></div>
           )}
 
           {tab === 'conductores' && apiKeySet && (

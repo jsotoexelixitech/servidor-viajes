@@ -93,7 +93,7 @@ function leerFilas(rows: Record<string, unknown>[]): FilaVista[] {
   return filas;
 }
 
-function descargarPlantilla() {
+export function descargarPlantilla() {
   const ejemplo = [
     { placa: 'RD101AA', cedula_conductor: 'V-31234567', nombre_conductor: 'JOSE PEREZ', serial_carroceria: '8XA53ZEC5K1000001', serial_motor: 'K1000001', anio: 2020, marca: 'TOYOTA', modelo: 'COROLLA', color: 'BLANCO' },
     { placa: 'RD102AA', cedula_conductor: 'V-32345678', nombre_conductor: 'MARIA GONZALEZ', serial_carroceria: '', serial_motor: '', anio: 2019, marca: 'CHEVROLET', modelo: 'AVEO', color: 'GRIS' },
