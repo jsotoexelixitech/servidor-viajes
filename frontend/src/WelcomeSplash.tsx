@@ -102,7 +102,7 @@ export function WelcomeSplash() {
           />
 
           <img
-            src="/brand/mundial-isotipo.png"
+            src="brand/mundial-isotipo.png"
             alt="La Mundial de Seguros"
             draggable={false}
             className="relative w-[110px] sm:w-[140px] h-auto select-none"

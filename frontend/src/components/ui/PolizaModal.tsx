@@ -53,7 +53,7 @@ export function PolizaModal({ viaje, onClose }: { viaje: Viaje; onClose: () => v
             <div className="text-right shrink-0">
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white ring-1 ring-slate-200 flex items-center justify-center ml-auto p-1"
                 style={{ boxShadow: '0 3px 8px -1px rgb(15 26 90 / .15)' }}>
-                <img src="/logo-isotipo-transparente.png" alt="La Mundial" className="w-full h-full object-contain" />
+                <img src="logo-isotipo-transparente.png" alt="La Mundial" className="w-full h-full object-contain" />
               </div>
               <p className="text-[10px] text-slate-600 mt-1.5 font-bold uppercase tracking-wider hidden sm:block">Documento Oficial</p>
             </div>

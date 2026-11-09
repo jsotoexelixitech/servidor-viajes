@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { installDemoInterceptor } from './demo';
+import { APP_ROOT, appUrl } from './lib/base';
 
-const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const BASE_URL = import.meta.env.VITE_API_URL || appUrl('api');
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -742,7 +743,7 @@ export const flotaPresentacionApi = {
 };
 
 /** Link público de solo lectura (sin login): /poliza/<token>. */
-export const linkPublicoPoliza = (token: string) => `${window.location.origin}/poliza/${encodeURIComponent(token)}`;
+export const linkPublicoPoliza = (token: string) => `${window.location.origin}${APP_ROOT}poliza/${encodeURIComponent(token)}`;
 
 export const publicoApi = {
   poliza: (token: string, q: { rev?: string; desde?: string; hasta?: string }) =>

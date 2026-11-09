@@ -21,7 +21,7 @@ export function PolizaPublica({ token }: { token: string }) {
       <Toaster position="top-right" />
       <header className="bg-[#0F1A5A] text-white">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-          <img src="/logo-isotipo-transparente.png" alt="" className="w-9 h-9 object-contain" />
+          <img src="logo-isotipo-transparente.png" alt="" className="w-9 h-9 object-contain" />
           <div className="min-w-0">
             <p className="font-display font-bold leading-tight truncate">La Mundial de Seguros</p>
             <p className="text-[11px] opacity-80 leading-tight">Póliza de flota por uso · vista de solo lectura</p>

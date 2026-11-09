@@ -6,6 +6,7 @@ import {
   Viaje, UiConfig,
 } from './api';
 import { BRAND_DEFAULT, BrandContext, applyBranding, mergeBrand } from './lib/branding';
+import { appUrl } from './lib/base';
 import { setDemoMode, isDemoMode, DEMO_INFO, buildDemoViajeBody } from './demo';
 import { WelcomeSplash } from './WelcomeSplash';
 
@@ -690,7 +691,7 @@ export default function App() {
             <span>Sistema de Emisión Automática</span>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-500 font-semibold">
-            <a href="/api/docs" target="_blank" rel="noopener noreferrer"
+            <a href={appUrl('api/docs')} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-brand-500 transition-colors">
               {Ic.link()} API Docs
             </a>

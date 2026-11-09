@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { UiConfig } from '../api';
+import { assetUrl } from './base';
 
 /**
  * Marca de la pantalla. La base viene de GET /api/config/ui (por despliegue) y cada flota
@@ -10,7 +11,7 @@ export const BRAND_DEFAULT: UiConfig = {
   brandName: 'La Mundial',
   brandSuffix: 'de Seguros',
   appTitle: 'Flota por uso',
-  logoUrl: '/brand/mundial-isotipo.png',
+  logoUrl: assetUrl('/brand/mundial-isotipo.png'),
   colors: {
     primary: '#0F1A5A', primaryDeep: '#091133', primaryBright: '#162A7F', blue: '#2E6DBF',
     accent: '#E84F51', accentCta: '#D4403F', accentHover: '#BF3534',
@@ -21,12 +22,14 @@ export const BRAND_DEFAULT: UiConfig = {
 
 export function mergeBrand(base: UiConfig, over?: Partial<UiConfig> | null): UiConfig {
   if (!over) return base;
-  return {
+  const merged = {
     ...base,
     ...Object.fromEntries(Object.entries(over).filter(([k, v]) => k !== 'colors' && v !== undefined && v !== null && v !== '')),
     colors: { ...base.colors, ...(over.colors ?? {}) },
     authModes: over.authModes?.length ? over.authModes : base.authModes,
   } as UiConfig;
+  // El backend puede mandar '/brand/...': bajo /pinkriders/ hay que resolverlo desde la raíz de la app.
+  return { ...merged, logoUrl: assetUrl(merged.logoUrl) };
 }
 
 const CSS_VARS: Record<keyof UiConfig['colors'], string> = {

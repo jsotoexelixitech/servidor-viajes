@@ -2,8 +2,20 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/logo-isotipo-transparente.png" />
+    <script>
+      // Raíz de la app según dónde se sirva (/ en :3096, /pinkriders/ detrás de Apache).
+      // El link público /poliza/<token> también resuelve sus archivos desde la raíz.
+      (function () {
+        var p = window.location.pathname;
+        var i = p.indexOf('/poliza/');
+        var raiz = i >= 0 ? p.slice(0, i + 1) : p.replace(/[^/]*$/, '');
+        var b = document.createElement('base');
+        b.href = raiz || '/';
+        document.head.appendChild(b);
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="logo-isotipo-transparente.png" />
     <meta name="theme-color" content="#0F1A5A" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Flota por uso y suscripción digital de pólizas RCV — La Mundial de Seguros" />

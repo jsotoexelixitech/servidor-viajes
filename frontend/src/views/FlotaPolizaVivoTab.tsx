@@ -477,7 +477,7 @@ function Cabecera({ data }: { data: PolizaVivo }) {
   return (
     <table><tbody><tr>
       <td style={{ width: '45%', verticalAlign: 'top' }}>
-        <img src="/brand/mundial-lockup.png" alt={data.empresa.nombre} style={{ height: 58, objectFit: 'contain' }} draggable={false} />
+        <img src="brand/mundial-lockup.png" alt={data.empresa.nombre} style={{ height: 58, objectFit: 'contain' }} draggable={false} />
       </td>
       <td style={{ width: '55%', verticalAlign: 'top', fontSize: 10, textAlign: 'right' }}>
         <table style={{ marginLeft: 'auto', width: 'auto' }}><tbody>

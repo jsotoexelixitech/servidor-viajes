@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  // Relativo: la app se sirve en / (:3096) y en /pinkriders/ (Apache). Ver el <base> de index.html.
+  base: './',
   plugins: [react()],
   server: {
     port: 5173,
