@@ -85,7 +85,7 @@ export function FlotaPanel({
     return (
       <EmptyState
         title="Flota por uso trabaja con datos reales"
-        sub="Desactiva el modo demo y conéctate con la API key de la plataforma (Ridery). Para probar sin Ridery usa el Simulador."
+        sub="Desactiva el modo demo y conéctate con la API key de la plataforma. Para probar sin conexión usa el Simulador."
       />
     );
   }

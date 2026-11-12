@@ -75,7 +75,7 @@ export function DistanciaTab({ pushNotif }: { pushNotif: PushNotif }) {
       <div className="card p-5 xl:col-span-2 space-y-4">
         <p className="section-title">{Ic.car('w-3.5 h-3.5')} Clasificación de distancia y tarifa por km</p>
         <p className="text-xs text-slate-500">
-          Ridery informa el viaje y devolvemos el monto: km × tarifa de su clasificación (o el mínimo). Si Ridery no manda
+          La plataforma informa el viaje y devolvemos el monto: km × tarifa de su clasificación (o el mínimo). Si la plataforma no manda
           la clasificación (URBANO, EXTRA_URBANO o INTERURBANO), se decide por el rango de km. La tarifa se aplica al viaje completo.
           Para usar Interurbano: actívelo y ajuste el "km hasta" de Extra urbano para que los rangos no se solapen.
         </p>
@@ -123,7 +123,7 @@ export function DistanciaTab({ pushNotif }: { pushNotif: PushNotif }) {
 
       <div className="card p-5 space-y-4">
         <p className="section-title">{Ic.sparkle('w-3.5 h-3.5')} Calculadora</p>
-        <p className="text-xs text-slate-500">Lo que devolvería la API a Ridery para un viaje de estos km (con lo guardado).</p>
+        <p className="text-xs text-slate-500">Lo que devolvería la API a la plataforma para un viaje de estos km (con lo guardado).</p>
         <div className="flex items-end gap-2">
           <label className="label mb-0 flex-1">Km del viaje
             <input type="number" min={0} step="0.1" className={inputCls} value={km} onChange={(e) => setKm(n(e.target.value))} />
@@ -274,7 +274,7 @@ export function RecibosViajeTab({ pushNotif }: { pushNotif: PushNotif }) {
 
   if (!list) return <div className="card p-10 flex justify-center"><Spinner size="lg" /></div>;
   if (list.length === 0) {
-    return <EmptyState title="Aún no hay pagos de viajes" sub="Cuando Ridery informe el pago de un viaje, aquí aparece su recibo sobre el certificado del conductor." />;
+    return <EmptyState title="Aún no hay pagos de viajes" sub="Cuando la plataforma informe el pago de un viaje, aquí aparece su recibo sobre el certificado del conductor." />;
   }
   const total = list.reduce((a, p) => a + n(p.monto), 0);
   return (

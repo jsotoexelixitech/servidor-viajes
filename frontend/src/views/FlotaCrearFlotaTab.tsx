@@ -16,8 +16,9 @@ import { Ic } from '../components/ui/Icons';
 type PushNotif = (tipo: Notif['tipo'], titulo: string, msg: string) => void;
 
 const TOMADOR_RIF = 'J-500969210';
-const TOMADOR_NOMBRE = 'Desarrollos Tecnologicos Ridery, C.A';
+const TOMADOR_NOMBRE = 'Plataforma de viajes, C.A';
 const PLANES = ['RIDERY', 'RIDER1', 'RIDER2'];
+const PLAN_NOMBRE: Record<string, string> = { RIDERY: 'Plan base', RIDER1: 'Plan 1', RIDER2: 'Plan 2' };
 const COLUMNAS = ['placa', 'cedula_conductor', 'nombre_conductor', 'serial_carroceria', 'serial_motor', 'anio', 'marca', 'modelo', 'color'];
 const inputCls = 'input mt-1 normal-case tracking-normal font-medium';
 
@@ -102,7 +103,7 @@ export function descargarPlantilla() {
   ws['!cols'] = COLUMNAS.map((c) => ({ wch: Math.max(12, c.length + 2) }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'conductores');
-  XLSX.writeFile(wb, 'plantilla-flota-ridery.xlsx');
+  XLSX.writeFile(wb, 'plantilla-flota.xlsx');
 }
 
 // ── Póliza activa: link público, QR, desasociar y selector ─────────────────
@@ -374,7 +375,7 @@ export function CrearFlotaTab({ pushNotif }: { pushNotif: PushNotif }) {
               </label>
               <label className="label">Plan
                 <select className={inputCls} value={datos.cplan} disabled={usarActiva} onChange={(e) => setDatos({ ...datos, cplan: e.target.value })}>
-                  {PLANES.map((p) => <option key={p} value={p}>{p}</option>)}
+                  {PLANES.map((p) => <option key={p} value={p}>{PLAN_NOMBRE[p] ?? p}</option>)}
                 </select>
               </label>
               <div className="grid grid-cols-2 gap-2">

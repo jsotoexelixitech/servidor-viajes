@@ -590,7 +590,7 @@ export default function App() {
             <div className="card p-10 text-center animate-in">
               <div className="w-12 h-12 rounded-2xl gradient-brand text-white flex items-center justify-center mx-auto mb-3">{Ic.car('w-5 h-5')}</div>
               <p className="text-sm font-extrabold text-slate-800 mb-1">Conecta la API Key de la flota</p>
-              <p className="text-xs text-slate-600 max-w-sm mx-auto">Flota por uso muestra los viajes y el cobro del mes de la plataforma conectada (ej. Ridery). Pega su API Key arriba y pulsa Conectar.</p>
+              <p className="text-xs text-slate-600 max-w-sm mx-auto">Flota por uso muestra los viajes y el cobro del mes de la plataforma conectada. Pega su API Key arriba y pulsa Conectar.</p>
             </div>
           )}
 
