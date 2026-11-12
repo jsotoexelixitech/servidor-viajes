@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import type { PasajeroViaje } from '../dto/pasajero.dto';
 
 export enum EstadoViajeFlota {
   INICIADO = 'INICIADO',
@@ -98,6 +99,10 @@ export class FlotaViaje {
   /** PENDIENTE (monto devuelto, falta el pago) · PAGADO. */
   @Column({ name: 'estado_pago', type: 'varchar', length: 12, nullable: true })
   estadoPago: 'PENDIENTE' | 'PAGADO' | null;
+
+  /** Personas que viajan, informadas en el INICIO (null = viaje anterior al cambio o simulado). */
+  @Column({ type: 'jsonb', nullable: true })
+  pasajeros: PasajeroViaje[] | null;
 
   /** Generado por el simulador (pruebas). */
   @Column({ type: 'boolean', default: false })

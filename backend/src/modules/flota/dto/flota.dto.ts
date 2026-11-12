@@ -1,8 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString,
-  Matches, Max, MaxLength, Min,
+  Matches, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
+import { EsListaPasajeros, PasajeroDto } from './pasajero.dto';
 
 export class InicioViajeDto {
   @ApiProperty({ example: 'RDY-000123', description: 'Id del viaje en la plataforma (único).' })
@@ -28,6 +30,12 @@ export class InicioViajeDto {
   @ApiPropertyOptional({ example: { lat: 10.49, lng: -66.88, direccion: 'Altamira' } })
   @IsOptional() @IsObject()
   origen?: Record<string, unknown>;
+
+  @ApiProperty({ type: [PasajeroDto], description: 'Personas que viajan (mínimo 1).' })
+  @EsListaPasajeros()
+  @ValidateNested({ each: true, message: 'pasajeros: cada elemento debe ser un objeto con los datos de la persona.' })
+  @Type(() => PasajeroDto)
+  pasajeros: PasajeroDto[];
 }
 
 export class FinViajeDto {

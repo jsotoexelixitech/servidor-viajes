@@ -37,6 +37,8 @@ else
   AUTH=(-H "X-Session-Token: $TOKEN")
 fi
 
+# Pasajero de demostración: cada INICIO exige la lista de personas que viajan.
+PAS_DEMO='[{"tipoDoc":"V","documento":"11222333","nombres":"Pasajero","apellidos":"Demo","telefono":"+584120000000","correo":"pasajero.demo@example.com"}]'
 api() { # método ruta [json]
   curl -sS -X "$1" "$BASE$2" "${AUTH[@]}" -H 'Content-Type: application/json' ${3:+-d "$3"}
 }
@@ -56,7 +58,7 @@ viaje() {
   N=$((N + 1)); id="$PREF-$N"
   [ -n "$clas" ] && clasJson=",\"clasificacion\":\"$clas\""
   ini=$(date -u -d "-$((km / 2 + 5)) min" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
-  api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"INICIO\",\"fecha\":\"$ini\",\"placa\":\"$placa\",\"conductorDoc\":\"$doc\",\"conductorNombre\":\"$nombre\",\"kmEstimados\":$km$clasJson}" > /dev/null
+  api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"INICIO\",\"pasajeros\":$PAS_DEMO,\"fecha\":\"$ini\",\"placa\":\"$placa\",\"conductorDoc\":\"$doc\",\"conductorNombre\":\"$nombre\",\"kmEstimados\":$km$clasJson}" > /dev/null
   echo "  $id INICIO  $nombre  ~$km km  (EN CURSO)"
   sleep "$PAUSA"
   fin=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -83,14 +85,14 @@ viaje 2 12 "" no           # queda POR COBRAR (sin pago)
 
 # Un viaje cancelado (no genera recibo)
 N=$((N + 1)); id="$PREF-$N"
-api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"INICIO\",\"placa\":\"$PLACA1\",\"conductorDoc\":\"$DOC1\",\"conductorNombre\":\"$NOMBRE1\"}" > /dev/null
+api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"INICIO\",\"pasajeros\":$PAS_DEMO,\"placa\":\"$PLACA1\",\"conductorDoc\":\"$DOC1\",\"conductorNombre\":\"$NOMBRE1\"}" > /dev/null
 sleep "$PAUSA"
 api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"CANCELACION\",\"motivo\":\"Pasajero canceló (demo)\"}" > /dev/null
 echo "  $id CANCELADO"
 
 # Un viaje que queda EN CURSO (se ve con la marca EN VIAJE)
 N=$((N + 1)); id="$PREF-$N"
-api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"INICIO\",\"placa\":\"$PLACA2\",\"conductorDoc\":\"$DOC2\",\"conductorNombre\":\"$NOMBRE2\",\"kmEstimados\":8}" > /dev/null
+api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"INICIO\",\"pasajeros\":$PAS_DEMO,\"placa\":\"$PLACA2\",\"conductorDoc\":\"$DOC2\",\"conductorNombre\":\"$NOMBRE2\",\"kmEstimados\":8}" > /dev/null
 echo "  $id INICIO (queda EN CURSO)"
 
 echo "▶ Resumen de la póliza en vivo:"

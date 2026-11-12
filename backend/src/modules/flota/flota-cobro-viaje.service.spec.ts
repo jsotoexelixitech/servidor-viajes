@@ -1,9 +1,10 @@
-import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { calcularMontoDistancia, FlotaCobroViajeService, normalizarDoc } from './flota-cobro-viaje.service';
 import { FlotaSis2000Client } from './flota-sis2000.client';
 import { FlotaService } from './flota.service';
 import { FlotaRecibosService } from './flota-recibos.service';
+import { MSG_PASAJEROS_OBLIGATORIO } from './dto/pasajero.dto';
 
 /** Repositorio en memoria (solo lo que usa el servicio). */
 function fakeRepo<T extends Record<string, unknown>>() {
@@ -94,8 +95,13 @@ describe('normalizarDoc', () => {
   });
 });
 
+const PASAJEROS = [
+  { tipoDoc: 'V' as const, documento: 'V-12.345.678', nombres: ' María ', apellidos: 'Pérez', telefono: '+58 (414) 123-4567', correo: 'Maria.Perez@Correo.com', esConductor: true },
+  { tipoDoc: 'P' as const, documento: 'ab-123456', nombres: 'John', apellidos: 'Smith', telefono: '04141234567', correo: 'john@correo.com', fechaNacimiento: '1990-05-17' },
+];
+
 describe('FlotaCobroViajeService', () => {
-  const inicio = { idViaje: 'RDY-1', tipo: 'INICIO' as const, fecha: '2026-11-01T14:00:00Z', placa: 'xx999', conductorDoc: 'V-12.345.678', kmEstimados: 8 };
+  const inicio = { idViaje: 'RDY-1', tipo: 'INICIO' as const, fecha: '2026-11-01T14:00:00Z', placa: 'xx999', conductorDoc: 'V-12.345.678', kmEstimados: 8, pasajeros: PASAJEROS };
   const fin = { idViaje: 'RDY-1', tipo: 'FIN' as const, fecha: '2026-11-01T14:30:00Z', km: 9.1 };
 
   it('INICIO ubica el certificado por cédula y devuelve el estimado; es idempotente', async () => {
@@ -106,6 +112,56 @@ describe('FlotaCobroViajeService', () => {
     const r2 = await svc.evento(T, inicio);
     expect(r2.duplicado).toBe(true);
     expect(viajes.rows).toHaveLength(1);
+  });
+
+  it('INICIO guarda los pasajeros normalizados y los devuelve en el estado del viaje', async () => {
+    const { svc, viajes } = setup();
+    const r = await svc.evento(T, inicio);
+    expect(r.pasajeros).toEqual([
+      { tipoDoc: 'V', documento: '12345678', nombres: 'María', apellidos: 'Pérez', telefono: '+584141234567', correo: 'maria.perez@correo.com', fechaNacimiento: null, esConductor: true },
+      { tipoDoc: 'P', documento: 'AB123456', nombres: 'John', apellidos: 'Smith', telefono: '04141234567', correo: 'john@correo.com', fechaNacimiento: '1990-05-17', esConductor: false },
+    ]);
+    expect(viajes.rows[0].pasajeros).toEqual(r.pasajeros);
+    expect((await svc.estadoCobro(T, 'RDY-1')).pasajeros).toEqual(r.pasajeros);
+  });
+
+  it('reenviar el mismo INICIO no duplica ni reemplaza los pasajeros', async () => {
+    const { svc, viajes } = setup();
+    await svc.evento(T, inicio);
+    const r2 = await svc.evento(T, { ...inicio, pasajeros: [...PASAJEROS, { ...PASAJEROS[1], documento: 'ZZ999' }] });
+    expect(r2.duplicado).toBe(true);
+    expect(r2.pasajeros).toHaveLength(2);
+    expect(viajes.rows).toHaveLength(1);
+    expect(viajes.rows[0].pasajeros).toHaveLength(2);
+  });
+
+  it('INICIO sin pasajeros → 400 con message como lista; no registra el viaje', async () => {
+    const { svc, viajes } = setup();
+    for (const pasajeros of [undefined, []]) {
+      const err = await svc.evento(T, { ...inicio, pasajeros }).catch((e) => e);
+      expect(err).toBeInstanceOf(BadRequestException);
+      expect(err.getResponse().message).toEqual([MSG_PASAJEROS_OBLIGATORIO]);
+    }
+    expect(viajes.rows).toHaveLength(0);
+  });
+
+  it('INICIO con el mismo documento dos veces en la lista → 400', async () => {
+    const { svc } = setup();
+    const err = await svc.evento(T, { ...inicio, pasajeros: [PASAJEROS[0], { ...PASAJEROS[0], documento: '12345678' }] }).catch((e) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect(err.getResponse().message[0]).toContain('V-12345678 está repetido');
+  });
+
+  it('FIN y CANCELACION no exigen pasajeros', async () => {
+    const { svc } = setup();
+    await svc.evento(T, inicio);
+    expect((await svc.evento(T, fin)).estado).toBe('FINALIZADO');
+    await svc.evento(T, { ...inicio, idViaje: 'RDY-2' });
+    expect((await svc.evento(T, { idViaje: 'RDY-2', tipo: 'CANCELACION' })).estado).toBe('CANCELADO');
+    // FIN sin INICIO previo (con placa): se registra sin pasajeros.
+    const r = await svc.evento(T, { idViaje: 'RDY-3', tipo: 'FIN', placa: 'AB123CD', km: 5 });
+    expect(r.estado).toBe('FINALIZADO');
+    expect(r.pasajeros).toEqual([]);
   });
 
   it('FIN devuelve el monto por km y deja el pago PENDIENTE', async () => {
@@ -226,7 +282,7 @@ describe('certificados con FLOTA_RECIBO_REAL=1', () => {
 });
 
 describe('sincronizar recibos pendientes', () => {
-  const inicio = { idViaje: 'RDY-5', tipo: 'INICIO' as const, fecha: '2026-11-01T14:00:00Z', placa: 'xx999', conductorDoc: 'V-12.345.678', kmEstimados: 8 };
+  const inicio = { idViaje: 'RDY-5', tipo: 'INICIO' as const, fecha: '2026-11-01T14:00:00Z', placa: 'xx999', conductorDoc: 'V-12.345.678', kmEstimados: 8, pasajeros: PASAJEROS };
   const fin = { idViaje: 'RDY-5', tipo: 'FIN' as const, fecha: '2026-11-01T14:30:00Z', km: 9.1 };
 
   it('reintenta el recibo COBRADO con sync ERROR y lo deja OK con cnrecibo de Sis2000', async () => {

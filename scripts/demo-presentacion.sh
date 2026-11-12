@@ -31,6 +31,8 @@ else
   [ -n "$TOKEN" ] || { echo "✖ Sin API_KEY y el acceso directo no respondió (¿FLOTA_ACCESO_DIRECTO=1?)."; exit 1; }
   AUTH=(-H "X-Session-Token: $TOKEN")
 fi
+# Pasajero de demostración: cada INICIO exige la lista de personas que viajan.
+PAS_DEMO='[{"tipoDoc":"V","documento":"11222333","nombres":"Pasajero","apellidos":"Demo","telefono":"+584120000000","correo":"pasajero.demo@example.com"}]'
 api() { curl -sS -X "$1" "$BASE$2" "${AUTH[@]}" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
 
 # ── 1. Póliza activa y sus conductores ───────────────────────────────────────
@@ -77,7 +79,7 @@ viaje() {
   N=$((N + 1)); id="$PREF-$N"
   [ -n "$clas" ] && clasJson=",\"clasificacion\":\"$clas\""
   ini=$(date -u -d "-$((km / 2 + 5)) min" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
-  api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"INICIO\",\"fecha\":\"$ini\",\"placa\":\"$placa\",\"conductorDoc\":\"$doc\",\"conductorNombre\":\"$nombre\",\"kmEstimados\":$km$clasJson}" > /dev/null
+  api POST /flota/viajes/evento "{\"idViaje\":\"$id\",\"tipo\":\"INICIO\",\"pasajeros\":$PAS_DEMO,\"fecha\":\"$ini\",\"placa\":\"$placa\",\"conductorDoc\":\"$doc\",\"conductorNombre\":\"$nombre\",\"kmEstimados\":$km$clasJson}" > /dev/null
   echo "  $id INICIO  cert $cc $nombre  ~$km km  (EN CURSO)"
   sleep "$PAUSA"
   fin=$(date -u +%Y-%m-%dT%H:%M:%SZ)

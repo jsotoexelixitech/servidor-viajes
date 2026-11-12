@@ -45,13 +45,14 @@ export class FlotaCobroViajeController {
     summary: 'Evento de viaje: INICIO, FIN o CANCELACION (idempotente por idViaje)',
     description:
       'INICIO registra el viaje y ubica el certificado del conductor (por cédula o placa); si trae kmEstimados devuelve montoEstimado. ' +
+      'En INICIO es obligatorio `pasajeros` (mínimo 1 persona con tipoDoc, documento, nombres, apellidos, telefono y correo): sin ella responde 400. ' +
       'FIN calcula el monto por km según la clasificación urbano / extra urbano y lo devuelve en `monto` (estadoPago=PENDIENTE). ' +
       'Repetir un evento ya aplicado devuelve el mismo resultado con duplicado=true.',
   })
   @ApiBody({
     type: EventoViajeDto,
     examples: {
-      inicio: { value: { idViaje: 'RDY-000123', tipo: 'INICIO', fecha: '2026-11-01T14:05:00-04:00', placa: 'AB123CD', conductorDoc: 'V-12345678', conductorNombre: 'José Pérez', kmEstimados: 8.4 } },
+      inicio: { value: { idViaje: 'RDY-000123', tipo: 'INICIO', fecha: '2026-11-01T14:05:00-04:00', placa: 'AB123CD', conductorDoc: 'V-12345678', conductorNombre: 'José Pérez', kmEstimados: 8.4, pasajeros: [{ tipoDoc: 'V', documento: '12345678', nombres: 'María José', apellidos: 'Pérez Gómez', telefono: '+584141234567', correo: 'maria.perez@correo.com', fechaNacimiento: '1990-05-17', esConductor: false }] } },
       fin: { value: { idViaje: 'RDY-000123', tipo: 'FIN', fecha: '2026-11-01T14:31:00-04:00', km: 9.1 } },
       cancelacion: { value: { idViaje: 'RDY-000124', tipo: 'CANCELACION', motivo: 'Pasajero canceló' } },
     },
@@ -100,7 +101,7 @@ export class FlotaCobroViajeController {
   }
 
   @Get('viajes/:idViaje/cobro')
-  @ApiOperation({ summary: 'Estado del cobro de un viaje (monto, pago y recibo)' })
+  @ApiOperation({ summary: 'Estado del cobro de un viaje (monto, pago, recibo y pasajeros)' })
   estado(@CurrentTenant() t: Tenant, @Param('idViaje') idViaje: string) {
     return this.svc.estadoCobro(t.id, idViaje);
   }

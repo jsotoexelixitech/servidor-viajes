@@ -23,7 +23,7 @@ export class FlotaController {
 
   // ── Plataforma (Ridery) ──
   @Post('viajes/inicio')
-  @ApiOperation({ summary: 'Inicio de viaje (idempotente por idExterno)' })
+  @ApiOperation({ summary: 'Inicio de viaje (idempotente por idExterno). Obligatorio `pasajeros` (mínimo 1).' })
   inicio(@CurrentTenant() t: Tenant, @Body() dto: InicioViajeDto) {
     return this.svc.iniciarViaje(t.id, dto);
   }

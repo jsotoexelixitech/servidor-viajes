@@ -5,6 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { In, Repository } from 'typeorm';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
+import { prepararPasajeros } from './dto/pasajero.dto';
 import { FlotaConfig, ModalidadCobro, ModoCierre } from './entities/flota-config.entity';
 import { EstadoViajeFlota, FlotaViaje } from './entities/flota-viaje.entity';
 import { EstadoCierre, FlotaCierre } from './entities/flota-cierre.entity';
@@ -115,9 +116,13 @@ export class FlotaService {
 
   // ── Viajes (lo que manda la plataforma) ──────────────────────────────────
 
-  async iniciarViaje(tenantId: string, dto: InicioViajeDto, simulado = false): Promise<FlotaViaje> {
+  async iniciarViaje(
+    tenantId: string, dto: Omit<InicioViajeDto, 'pasajeros'> & Partial<Pick<InicioViajeDto, 'pasajeros'>>, simulado = false,
+  ): Promise<FlotaViaje> {
     const existente = await this.viajeRepo.findOne({ where: { tenantId, idExterno: dto.idExterno } });
-    if (existente) return existente; // idempotente
+    if (existente) return existente; // idempotente: tampoco se vuelven a guardar los pasajeros
+    // Los viajes del simulador no traen pasajeros; los de la plataforma, siempre.
+    const pasajeros = simulado && !dto.pasajeros?.length ? null : prepararPasajeros(dto.pasajeros);
     const viaje = this.viajeRepo.create({
       tenantId,
       idExterno: dto.idExterno,
@@ -127,6 +132,7 @@ export class FlotaService {
       estado: EstadoViajeFlota.INICIADO,
       inicio: dto.inicio ? new Date(dto.inicio) : new Date(),
       origen: dto.origen ?? null,
+      pasajeros,
       simulado,
     });
     return this.viajeRepo.save(viaje);

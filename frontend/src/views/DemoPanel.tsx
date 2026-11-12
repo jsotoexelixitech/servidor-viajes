@@ -126,6 +126,11 @@ export function DemoPanel({ pushNotif }: { pushNotif: PushNotif }) {
           await api.post('/flota/viajes/evento', {
             idViaje: id, tipo: 'INICIO', fecha: ini, placa: c.placa, conductorDoc: c.conductorDoc,
             conductorNombre: c.conductorNombre || '', kmEstimados: plan.km, ...clasJson,
+            // Cada INICIO exige las personas que viajan: pasajero ficticio de la demostración.
+            pasajeros: [{
+              tipoDoc: 'V', documento: '11222333', nombres: 'Pasajero', apellidos: 'Demo',
+              telefono: '+584120000000', correo: 'pasajero.demo@example.com',
+            }],
           });
           await sleep(pausa * 1000);
           const { data: fin } = await api.post<{ monto?: number | string; clasificacion?: string }>('/flota/viajes/evento', {

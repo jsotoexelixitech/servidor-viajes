@@ -4,6 +4,7 @@ import {
   ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsObject,
   IsOptional, IsString, MaxLength, Min, ValidateIf, ValidateNested,
 } from 'class-validator';
+import { EsListaPasajeros, PasajeroDto } from './pasajero.dto';
 
 export const TIPOS_EVENTO = ['INICIO', 'FIN', 'CANCELACION'] as const;
 export type TipoEventoViaje = (typeof TIPOS_EVENTO)[number];
@@ -37,6 +38,16 @@ export class EventoViajeDto {
   @ApiPropertyOptional({ example: 'José Pérez' })
   @IsOptional() @IsString() @MaxLength(150)
   conductorNombre?: string;
+
+  @ApiPropertyOptional({
+    type: [PasajeroDto],
+    description: 'OBLIGATORIO en INICIO: personas que viajan (mínimo 1). FIN y CANCELACION no lo exigen.',
+  })
+  @ValidateIf((o: EventoViajeDto) => o.tipo === 'INICIO' || o.pasajeros != null)
+  @EsListaPasajeros()
+  @ValidateNested({ each: true, message: 'pasajeros: cada elemento debe ser un objeto con los datos de la persona.' })
+  @Type(() => PasajeroDto)
+  pasajeros?: PasajeroDto[];
 
   @ApiPropertyOptional({ example: 8.4, description: 'INICIO: km estimados (devuelve monto estimado).' })
   @IsOptional() @IsNumber() @Min(0)

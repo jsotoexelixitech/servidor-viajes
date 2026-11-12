@@ -12,6 +12,7 @@ import { EstadoReciboViaje, FlotaPagoViaje } from './entities/flota-pago-viaje.e
 import {
   CertificadoDto, CotizarDistanciaDto, EventoViajeDto, GuardarTarifasDto, PagoViajeDto,
 } from './dto/cobro-viaje.dto';
+import { prepararPasajeros } from './dto/pasajero.dto';
 import { FlotaService } from './flota.service';
 import { FlotaSis2000Client, monedaSis2000, ReciboCertificadoPayload } from './flota-sis2000.client';
 import { FlotaRecibosService } from './flota-recibos.service';
@@ -332,7 +333,7 @@ export class FlotaCobroViajeService {
 
   async evento(tenantId: string, dto: EventoViajeDto) {
     switch (dto.tipo) {
-      case 'INICIO': return this.inicio(tenantId, dto);
+      case 'INICIO': return this.inicio(tenantId, dto, true);
       case 'FIN': return this.fin(tenantId, dto);
       case 'CANCELACION': return this.cancelacion(tenantId, dto);
       default: throw new BadRequestException('tipo debe ser INICIO, FIN o CANCELACION.');
@@ -349,13 +350,16 @@ export class FlotaCobroViajeService {
     }
   }
 
-  private async inicio(tenantId: string, dto: EventoViajeDto) {
+  /** exigirPasajeros: true en INICIO; el FIN sin INICIO previo registra el viaje sin exigirlos. */
+  private async inicio(tenantId: string, dto: EventoViajeDto, exigirPasajeros = false) {
     const existente = await this.buscar(tenantId, dto.idViaje);
     if (existente) {
+      // Idempotente: el viaje (y sus pasajeros) quedan como se guardaron la primera vez.
       this.validarModo(existente);
       return this.respuesta(existente, true);
     }
     if (!dto.placa) throw new BadRequestException('placa es obligatoria en INICIO.');
+    const pasajeros = exigirPasajeros || dto.pasajeros?.length ? prepararPasajeros(dto.pasajeros) : null;
     const cfg = await this.flota.getConfig(tenantId);
     const cert = await this.resolverCertificado(tenantId, cfg.cnpoliza, dto.conductorDoc, dto.placa);
     const viaje = this.viajeRepo.create({
@@ -371,6 +375,7 @@ export class FlotaCobroViajeService {
       cnpoliza: cfg.cnpoliza,
       ccerti: cert?.ccerti ?? null,
       clasificacion: dto.clasificacion ?? null,
+      pasajeros,
     });
     if (dto.kmEstimados != null) {
       const calc = calcularMontoDistancia(await this.getTarifas(tenantId), dto.kmEstimados, dto.clasificacion);
@@ -482,6 +487,8 @@ export class FlotaCobroViajeService {
       fin: v.fin,
       placa: v.placa,
       conductorDoc: v.conductorDoc,
+      /** Personas que viajan, tal como se guardaron en el INICIO. */
+      pasajeros: v.pasajeros ?? [],
       clasificacion: v.clasificacion,
       tarifaKm: v.tarifaKm != null ? num(v.tarifaKm) : null,
       kmEstimados: v.kmEstimados != null ? num(v.kmEstimados) : null,
