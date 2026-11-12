@@ -44,7 +44,7 @@ const ESTADO: Record<EstadoReciboVivo, { label: string; cls: string }> = {
   PAGADO:    { label: 'PAGADO',    cls: 'cr-badge cr-ok' },
   PENDIENTE: { label: 'POR COBRAR', cls: 'cr-badge cr-warn' },
   EN_CURSO:  { label: 'EN CURSO',  cls: 'cr-badge cr-info' },
-  ERROR:     { label: 'PAGADO · RECIBO CON ERROR', cls: 'cr-badge cr-err' },
+  ERROR:     { label: 'PAGADO · RECIBO EN PROCESO', cls: 'cr-badge cr-warn' },
   ANULADO:   { label: 'ANULADO',   cls: 'cr-badge cr-err' },
 };
 const CLASIF: Record<string, string> = { URBANO: 'URBANO', EXTRA_URBANO: 'EXTRA URBANO', INTERURBANO: 'INTERURBANO' };
@@ -234,7 +234,7 @@ export function PolizaVivoTab({ pushNotif, fetcher }: { pushNotif: PushNotif; fe
             <option value="PAGADO">Pagado</option>
             <option value="PENDIENTE">Por cobrar</option>
             <option value="EN_CURSO">En curso</option>
-            <option value="ERROR">Con error</option>
+            <option value="ERROR">Recibo en proceso</option>
           </select>
         </label>
         <div className="ml-auto flex items-center gap-2">
@@ -262,7 +262,7 @@ export function PolizaVivoTab({ pushNotif, fetcher }: { pushNotif: PushNotif; fe
         <Kpi label="Viajes finalizados" value={ve(t.viajes, 0)} sub={`${t.enCurso} en curso · ${t.cancelados} cancelados`} />
         <Kpi label="Km recorridos" value={ve(t.km, 1)} />
         <Kpi label="Primas cobradas" value={`${mon} ${ve(t.primasCobradas)}`} sub={`${t.pagados} recibos pagados`} tone="ok" />
-        <Kpi label="Por cobrar" value={`${mon} ${ve(t.primasPendientes)}`} sub={t.recibosError ? `${t.recibosError} recibos con error` : 'viajes sin pago'} tone={t.recibosError ? 'err' : 'warn'} />
+        <Kpi label="Por cobrar" value={`${mon} ${ve(t.primasPendientes)}`} sub={t.recibosError ? `${t.recibosError} recibos en proceso` : 'viajes sin pago'} tone={t.recibosError ? 'err' : 'warn'} />
       </div>
 
       {/* ── El cuadro (mismo modelo del PDF) ── */}
@@ -427,7 +427,7 @@ export function PolizaVivoTab({ pushNotif, fetcher }: { pushNotif: PushNotif; fe
                               <td>
                                 <span className={ESTADO[r.estado].cls}>{ESTADO[r.estado].label}</span>
                                 {r.estadoSis2000 && <span className="block text-[9.5px] text-slate-500">Sis2000: {r.estadoSis2000}</span>}
-                                {r.error && <span className="block text-[9.5px] text-red-700 max-w-[220px]">{r.error}</span>}
+                                {r.error && <span className="block text-[9.5px] text-slate-500 max-w-[220px]" title={r.error}>En proceso de registro en Sis2000</span>}
                               </td>
                               <td>{r.referencia ?? '—'}{r.metodo && <span className="text-slate-400"> · {r.metodo}</span>}</td>
                             </tr>

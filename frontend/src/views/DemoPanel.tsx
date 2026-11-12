@@ -277,7 +277,7 @@ export function DemoPanel({ pushNotif }: { pushNotif: PushNotif }) {
                       : 'bg-brand-50 text-brand-700'}`}>
                       {v.estado === 'INICIO' ? 'EN CURSO' : v.estado.replace('_', ' ')}
                     </span>
-                    {v.error && <span className="ml-1 text-red-600">{v.error}</span>}
+                    {v.error && <span className="ml-1 text-slate-500" title={v.error}>recibo en proceso</span>}
                   </td>
                 </tr>
               ))}
