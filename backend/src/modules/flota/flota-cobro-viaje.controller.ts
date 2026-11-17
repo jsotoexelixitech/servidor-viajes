@@ -8,6 +8,7 @@ import { Tenant } from '../tenant/entities/tenant.entity';
 import { FlotaCobroViajeService } from './flota-cobro-viaje.service';
 import { FlotaPolizaVivoService } from './flota-poliza-vivo.service';
 import { FlotaVivoBus } from './flota-vivo.bus';
+import { FlotaDocumentosService } from './flota-documentos.service';
 import {
   CertificadoDto, CotizarDistanciaDto, EventoViajeDto, GuardarTarifasDto, PagoViajeDto,
 } from './dto/cobro-viaje.dto';
@@ -27,7 +28,15 @@ export class FlotaCobroViajeController {
     private readonly svc: FlotaCobroViajeService,
     private readonly vivo: FlotaPolizaVivoService,
     private readonly bus: FlotaVivoBus,
+    private readonly docs: FlotaDocumentosService,
   ) {}
+
+  /** Tras cambiar certificados: re-registra la póliza en Nexus (documentos) en segundo plano; no falla. */
+  private async conDocumentos<T>(tenantId: string, p: Promise<T>): Promise<T> {
+    const r = await p;
+    this.docs.programar(tenantId);
+    return r;
+  }
 
   /** Avisa a la pantalla "Póliza en vivo" que hubo un cambio (también si falló: recarga y no pasa nada). */
   private async conAviso<T>(tenantId: string, p: Promise<T>): Promise<T> {
@@ -136,20 +145,20 @@ export class FlotaCobroViajeController {
   @Put('certificados')
   @ApiOperation({ summary: 'Crear o actualizar la asociación conductor → certificado (por póliza + ccerti)' })
   guardarCertificado(@CurrentTenant() t: Tenant, @Body() dto: CertificadoDto) {
-    return this.conAviso(t.id, this.svc.guardarCertificado(t.id, dto));
+    return this.conAviso(t.id, this.conDocumentos(t.id, this.svc.guardarCertificado(t.id, dto)));
   }
 
   @Delete('certificados/:id')
   @ApiOperation({ summary: 'Desactivar la asociación (no borra nada en Sis2000)' })
   desactivarCertificado(@CurrentTenant() t: Tenant, @Param('id') id: string) {
-    return this.conAviso(t.id, this.svc.desactivarCertificado(t.id, id));
+    return this.conAviso(t.id, this.conDocumentos(t.id, this.svc.desactivarCertificado(t.id, id)));
   }
 
   @Post('certificados/sincronizar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Traer los certificados (vhcerti) de la póliza desde Sis2000 vía nest-api' })
   sincronizar(@CurrentTenant() t: Tenant) {
-    return this.conAviso(t.id, this.svc.sincronizarCertificados(t.id));
+    return this.conAviso(t.id, this.conDocumentos(t.id, this.svc.sincronizarCertificados(t.id)));
   }
 
   // ── Pantalla: póliza en vivo (cuadro-recibo con un recibo por viaje en cada certificado) ──

@@ -10,6 +10,7 @@ import { FiltroRecibos, FlotaRecibosService } from './flota-recibos.service';
 import { FlotaVivoBus } from './flota-vivo.bus';
 import { AnularReciboDto, CrearPolizaFlotaDto, EmitirLoteDto, RegistrarPolizaDto } from './dto/cobro-viaje.dto';
 import { FlotaLoteService } from './flota-lote.service';
+import { FlotaDocumentosService } from './flota-documentos.service';
 
 const filtro = (q: Record<string, string | undefined>): FiltroRecibos => ({
   cnpoliza: q.cnpoliza || undefined,
@@ -34,6 +35,7 @@ export class FlotaPolizaRecibosController {
     private readonly svc: FlotaRecibosService,
     private readonly bus: FlotaVivoBus,
     private readonly lote: FlotaLoteService,
+    private readonly docs: FlotaDocumentosService,
   ) {}
 
   @Get('poliza')
@@ -50,7 +52,10 @@ export class FlotaPolizaRecibosController {
   })
   async registrar(@CurrentTenant() t: Tenant, @Body() dto: RegistrarPolizaDto) {
     try {
-      return await this.svc.registrarPoliza(t.id, dto, t.nombre);
+      const r = await this.svc.registrarPoliza(t.id, dto, t.nombre);
+      // Documentos del expediente: (re)registra la póliza en Nexus en segundo plano.
+      this.docs.programar(t.id);
+      return r;
     } finally {
       this.bus.bump(t.id);
     }
@@ -64,7 +69,10 @@ export class FlotaPolizaRecibosController {
   })
   async crear(@CurrentTenant() t: Tenant, @Body() dto: CrearPolizaFlotaDto) {
     try {
-      return await this.svc.crearPoliza(t.id, dto, t.nombre);
+      const r = await this.svc.crearPoliza(t.id, dto, t.nombre);
+      // Documentos del expediente: (re)registra la póliza en Nexus en segundo plano.
+      this.docs.programar(t.id);
+      return r;
     } finally {
       this.bus.bump(t.id);
     }
@@ -78,7 +86,10 @@ export class FlotaPolizaRecibosController {
   })
   async emitirLote(@CurrentTenant() t: Tenant, @Body() dto: EmitirLoteDto) {
     try {
-      return await this.lote.emitir(t.id, dto, t.nombre);
+      const r = await this.lote.emitir(t.id, dto, t.nombre);
+      // Documentos del expediente: (re)registra la póliza en Nexus en segundo plano.
+      this.docs.programar(t.id);
+      return r;
     } finally {
       this.bus.bump(t.id);
     }
@@ -108,7 +119,10 @@ export class FlotaPolizaRecibosController {
   @ApiOperation({ summary: 'Volver a dejar activa una póliza anterior (pasa a la configuración de la flota)' })
   async activar(@CurrentTenant() t: Tenant, @Param('id') id: string) {
     try {
-      return await this.svc.activarPoliza(t.id, id, t.nombre);
+      const r = await this.svc.activarPoliza(t.id, id, t.nombre);
+      // Documentos del expediente: (re)registra la póliza en Nexus en segundo plano.
+      this.docs.programar(t.id);
+      return r;
     } finally {
       this.bus.bump(t.id);
     }
