@@ -1,8 +1,9 @@
 import {
-  BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, PayloadTooLargeException,
+  BadRequestException, HttpStatus, Injectable, Logger, NotFoundException, OnModuleDestroy, PayloadTooLargeException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isUUID } from 'class-validator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FlotaCertificado } from './entities/flota-certificado.entity';
@@ -118,6 +119,67 @@ export interface SubirDocumentoInput {
   tipo: TipoDocumentoFlota;
   conductorDoc?: string;
   certificadoId?: string;
+}
+
+/** Envío en lote: máximo de archivos por llamada y campos multipart aceptados para el archivo. */
+export const MAX_ARCHIVOS_LOTE = 10;
+export const CAMPOS_ARCHIVO = ['archivo', 'archivos', 'file'] as const;
+
+/** Resultado de un archivo del lote (orden = el de los archivos recibidos). */
+export type ResultadoArchivoFlota = {
+  indice: number;
+  archivo: string | null;
+  tipo: string;
+  conductorDoc?: string | null;
+  certificadoId?: string;
+} & ({ ok: true; estado: string; documento?: string | null; ccerti?: number } | { ok: false; status: number; message: string });
+
+/**
+ * Valida el campo `items` (JSON array alineado por índice con los archivos):
+ * [{ tipo: 'rif' } | { tipo: 'cedula'|'pasaporte', conductorDoc?, certificadoId? }]. Devuelve los items o el
+ * mensaje del error de forma del lote (→ 400 sin procesar ningún archivo).
+ */
+export function itemsDelLote(raw: unknown, cantidadArchivos: number): SubirDocumentoInput[] | string {
+  if (cantidadArchivos === 0) return 'Envíe al menos un archivo (campo archivos, archivo o file).';
+  if (cantidadArchivos > MAX_ARCHIVOS_LOTE) return `Máximo ${MAX_ARCHIVOS_LOTE} archivos por envío.`;
+  if (raw == null || String(raw).trim() === '') {
+    return 'items es obligatorio cuando se envía más de un archivo (JSON array, uno por archivo).';
+  }
+  let lista: unknown;
+  try {
+    lista = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return 'items debe ser un JSON array válido.';
+  }
+  if (!Array.isArray(lista)) return 'items debe ser un JSON array.';
+  if (lista.length !== cantidadArchivos) {
+    return `items trae ${lista.length} elemento(s) y se enviaron ${cantidadArchivos} archivo(s); deben coincidir en cantidad y orden.`;
+  }
+  const items: SubirDocumentoInput[] = [];
+  for (let i = 0; i < lista.length; i++) {
+    const it = lista[i] as Record<string, unknown> | null;
+    if (!it || typeof it !== 'object' || Array.isArray(it)) {
+      return `items[${i}] debe ser un objeto { tipo, conductorDoc?, certificadoId? }.`;
+    }
+    const extra = Object.keys(it).find((k) => !['tipo', 'conductorDoc', 'certificadoId'].includes(k));
+    if (extra) return `items[${i}].${extra} no es un campo permitido (tipo, conductorDoc, certificadoId).`;
+    if (!(TIPOS_DOCUMENTO_FLOTA as readonly unknown[]).includes(it.tipo)) {
+      return `items[${i}].tipo inválido. Use: rif, cedula, pasaporte.`;
+    }
+    const item: SubirDocumentoInput = { tipo: it.tipo as TipoDocumentoFlota };
+    if (it.conductorDoc != null) {
+      if (typeof it.conductorDoc !== 'string' || it.conductorDoc.length > 30) {
+        return `items[${i}].conductorDoc debe ser texto de máximo 30 caracteres.`;
+      }
+      item.conductorDoc = it.conductorDoc;
+    }
+    if (it.certificadoId != null) {
+      if (typeof it.certificadoId !== 'string' || !isUUID(it.certificadoId)) return `items[${i}].certificadoId debe ser un UUID.`;
+      item.certificadoId = it.certificadoId;
+    }
+    items.push(item);
+  }
+  return items;
 }
 
 /**
@@ -312,5 +374,51 @@ export class FlotaDocumentosService implements OnModuleDestroy {
     } catch (err) {
       throw errorParaIntegrador(err);
     }
+  }
+
+  /**
+   * Varios documentos en un envío. Configuración y póliza se validan una vez (error → se lanza, nada se
+   * procesa); cada archivo pasa por `subir` (mismas validaciones y el mismo respaldo: si Nexus no tiene la
+   * póliza o al conductor, se registra y se repite) y su error queda en su resultado sin afectar a los demás.
+   * En serie, para que ese re-registro corra una sola vez y no saturar Nexus/OCR.
+   * httpStatus: 201 todos ok · 207 mezcla · todos fallan → el status del primer error.
+   */
+  async subirLote(tenantId: string, entradas: Array<SubirDocumentoInput & { archivo: ArchivoSubido }>) {
+    let cnpoliza: string;
+    try {
+      this.nexus.exigirConfiguracion();
+      cnpoliza = await this.cnpolizaActual(tenantId);
+    } catch (err) {
+      throw errorParaIntegrador(err);
+    }
+    const resultados: ResultadoArchivoFlota[] = [];
+    for (const [indice, { archivo, ...dto }] of entradas.entries()) {
+      const base = {
+        indice,
+        archivo: archivo?.originalname || null,
+        tipo: dto.tipo,
+        ...(dto.conductorDoc ? { conductorDoc: dto.conductorDoc } : {}),
+        ...(dto.certificadoId ? { certificadoId: dto.certificadoId } : {}),
+      };
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { cnpoliza: _poliza, ...r } = await this.subir(tenantId, archivo, dto);
+        resultados.push({ ...base, ...r, ok: true });
+      } catch (err) {
+        const e = errorParaIntegrador(err);
+        resultados.push({ ...base, ok: false, status: e.getStatus(), message: e.message });
+      }
+    }
+    const fallidos = resultados.filter((r) => !r.ok);
+    const httpStatus =
+      fallidos.length === 0
+        ? HttpStatus.CREATED
+        : fallidos.length < resultados.length
+          ? 207 // Multi-Status
+          : (fallidos[0] as { status: number }).status;
+    return {
+      httpStatus,
+      data: { cnpoliza, recibidos: resultados.length - fallidos.length, fallidos: fallidos.length, resultados },
+    };
   }
 }

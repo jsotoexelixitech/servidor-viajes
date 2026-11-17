@@ -1,6 +1,7 @@
 import { HttpException, ValidationPipe } from '@nestjs/common';
 import {
-  armarRegistroTrayecto, documentoComparable, FlotaDocumentosService, integradorFlota, MAX_ARCHIVO_DOCUMENTO,
+  armarRegistroTrayecto, documentoComparable, FlotaDocumentosService, integradorFlota, itemsDelLote, MAX_ARCHIVO_DOCUMENTO,
+  MAX_ARCHIVOS_LOTE,
   requisitoDeConductor, tipoArchivo,
 } from './flota-documentos.service';
 import { FlotaExpedienteClient, NexusExpedienteError } from './flota-expediente.client';
@@ -301,8 +302,9 @@ describe('Documentos de flota — controllers', () => {
     const docs = { subir: jest.fn(async () => ({ ok: true })) };
     const ctrl = new FlotaDocumentosController(docs as never);
     const t = { id: TENANT } as never;
-    await ctrl.subir(t, { file: [archivo(JPG)] }, { tipo: 'rif' });
-    await ctrl.subir(t, { archivo: [archivo(PDF)] }, { tipo: 'rif' });
+    const res = { status: jest.fn() } as never;
+    await ctrl.subir(t, [{ ...archivo(JPG), fieldname: 'file' }], { tipo: 'rif' }, res);
+    await ctrl.subir(t, [{ ...archivo(PDF), fieldname: 'archivo' }], { tipo: 'rif' }, res);
     expect((docs.subir.mock.calls[0] as unknown[])[1]).toMatchObject({ buffer: JPG });
     expect((docs.subir.mock.calls[1] as unknown[])[1]).toMatchObject({ buffer: PDF });
   });
@@ -323,5 +325,127 @@ describe('Documentos de flota — controllers', () => {
     await expect(ctrl.desactivarCertificado(t, 'x')).rejects.toMatchObject({ status: 404 });
     expect(docs.programar).toHaveBeenCalledTimes(1);
     expect(bus.bump).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Documentos de flota — lote (varios archivos por envío)', () => {
+  const UUID = '0b6f1f0e-1c2d-4e5f-8a9b-0c1d2e3f4a5b';
+  const GIF = Buffer.from('GIF89a-no-permitido-xx');
+  const multer = (buffer: Buffer, nombre: string, fieldname = 'archivos') => ({ buffer, originalname: nombre, size: buffer.length, fieldname });
+  function controlador(opts: Parameters<typeof crear>[0] = {}) {
+    const c = crear(opts);
+    const res = { status: jest.fn() };
+    return { ...c, ctrl: new FlotaDocumentosController(c.svc), res, t: { id: TENANT } as never };
+  }
+
+  it('items: forma, campos permitidos, cantidad y máximo de 10', () => {
+    expect(itemsDelLote(`[{"tipo":"rif"},{"tipo":"cedula","conductorDoc":"V-1"},{"tipo":"pasaporte","certificadoId":"${UUID}"}]`, 3)).toEqual([
+      { tipo: 'rif' },
+      { tipo: 'cedula', conductorDoc: 'V-1' },
+      { tipo: 'pasaporte', certificadoId: UUID },
+    ]);
+    expect(itemsDelLote('[{"tipo":"rif"}]', 2)).toMatch(/deben coincidir/);
+    expect(itemsDelLote(undefined, 2)).toMatch(/items es obligatorio/);
+    expect(itemsDelLote('nojson', 1)).toMatch(/JSON array válido/);
+    expect(itemsDelLote('[{"tipo":"licencia"}]', 1)).toMatch(/items\[0\]\.tipo/);
+    expect(itemsDelLote('[{"tipo":"rif","extra":1}]', 1)).toMatch(/items\[0\]\.extra/);
+    expect(itemsDelLote('[{"tipo":"cedula","certificadoId":"no-uuid"}]', 1)).toMatch(/UUID/);
+    expect(itemsDelLote('[]', MAX_ARCHIVOS_LOTE + 1)).toMatch(/Máximo 10 archivos/);
+  });
+
+  it('un solo archivo con campos sueltos: idéntico a hoy (sin tocar el status)', async () => {
+    const { ctrl, res, t } = controlador();
+    const r = await ctrl.subir(t, [multer(PDF, 'rif.pdf', 'archivo')], { tipo: 'rif' }, res as never);
+    expect(r).toEqual({ cnpoliza: POLIZA, tipo: 'rif', estado: 'recibido' });
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('lote ok: 201 con resultado por archivo, en orden y en serie', async () => {
+    const { ctrl, res, t, nexus } = controlador();
+    const items = JSON.stringify([
+      { tipo: 'rif' },
+      { tipo: 'cedula', conductorDoc: 'V-12345678' },
+      { tipo: 'pasaporte', conductorDoc: 'E-81234567' },
+    ]);
+    const r = (await ctrl.subir(
+      t,
+      [multer(PDF, 'rif.pdf'), multer(JPG, 'ced.jpg'), multer(WEBP, 'pas.webp')],
+      { items } as never,
+      res as never,
+    )) as { cnpoliza: string; recibidos: number; fallidos: number; resultados: unknown[] };
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(r).toMatchObject({ cnpoliza: POLIZA, recibidos: 3, fallidos: 0 });
+    expect(r.resultados).toEqual([
+      { indice: 0, archivo: 'rif.pdf', tipo: 'rif', estado: 'recibido', ok: true },
+      expect.objectContaining({ indice: 1, archivo: 'ced.jpg', tipo: 'cedula', documento: '12345678', conductorDoc: 'V-12.345.678', certificadoId: 'cert-1', ok: true }),
+      expect.objectContaining({ indice: 2, tipo: 'pasaporte', conductorDoc: 'E-81234567', ccerti: 2, ok: true }),
+    ]);
+    expect(nexus.subir.mock.calls.map((c) => (c as unknown[])[3])).toEqual(['rif', 'cedula', 'pasaporte']);
+  });
+
+  it('lote mixto: 207; un archivo malo no tumba a los demás; respaldo de registro por archivo', async () => {
+    const { ctrl, res, t, nexus } = controlador();
+    // Nexus aún no tiene al conductor: se registra la póliza y se repite (una vez) solo para ese archivo.
+    nexus.subir
+      .mockImplementationOnce(async () => ({ tipo: 'rif', estado: 'recibido' as const }))
+      .mockRejectedValueOnce(new NexusExpedienteError(400, 'El documento no corresponde a ningún conductor activo de la póliza.'));
+    const items = JSON.stringify([
+      { tipo: 'rif' },
+      { tipo: 'cedula', conductorDoc: 'E-81234567' },
+      { tipo: 'cedula', conductorDoc: 'V-99999999' },
+      { tipo: 'cedula', conductorDoc: 'V-12345678' },
+    ]);
+    const r = (await ctrl.subir(
+      t,
+      [multer(PDF, 'rif.pdf', 'archivo'), multer(JPG, 'a.jpg', 'archivo'), multer(JPG, 'b.jpg', 'archivo'), multer(GIF, 'c.gif', 'archivo')],
+      { items } as never,
+      res as never,
+    )) as { recibidos: number; fallidos: number; resultados: unknown[] };
+    expect(res.status).toHaveBeenCalledWith(207);
+    expect(r).toMatchObject({ recibidos: 2, fallidos: 2 });
+    expect(r.resultados).toEqual([
+      expect.objectContaining({ indice: 0, ok: true }),
+      expect.objectContaining({ indice: 1, ok: true, conductorDoc: 'E-81234567' }),
+      { indice: 2, archivo: 'b.jpg', tipo: 'cedula', conductorDoc: 'V-99999999', ok: false, status: 404, message: 'El conductor no tiene certificado activo en la póliza de la flota.' },
+      { indice: 3, archivo: 'c.gif', tipo: 'cedula', conductorDoc: 'V-12345678', ok: false, status: 415, message: 'Formato no permitido. Use PDF, JPG, PNG o WEBP.' },
+    ]);
+    expect(nexus.registrar).toHaveBeenCalledTimes(1);
+    expect(nexus.subir).toHaveBeenCalledTimes(3);
+  });
+
+  it('lote donde todos fallan: status del primer error (Nexus caído → 502)', async () => {
+    const { ctrl, res, t, nexus } = controlador();
+    nexus.subir.mockRejectedValue(new NexusExpedienteError(500, 'boom'));
+    const r = await ctrl.subir(t, [multer(PDF, 'a.pdf'), multer(PDF, 'b.pdf')], { items: '[{"tipo":"rif"},{"tipo":"rif"}]' } as never, res as never);
+    expect(res.status).toHaveBeenCalledWith(502);
+    expect(r).toMatchObject({ recibidos: 0, fallidos: 2 });
+  });
+
+  it('errores de forma del lote: 400 sin procesar nada; sin configuración 503', async () => {
+    const { ctrl, res, t, nexus } = controlador();
+    const dos = [multer(PDF, 'a.pdf'), multer(PDF, 'b.pdf')];
+    await expect(ctrl.subir(t, dos, { items: '[{"tipo":"rif"}]' } as never, res as never)).rejects.toMatchObject({ status: 400 });
+    await expect(ctrl.subir(t, dos, { tipo: 'rif' }, res as never)).rejects.toMatchObject({ status: 400 });
+    await expect(
+      ctrl.subir(t, dos, { items: '[{"tipo":"rif"},{"tipo":"rif"}]', tipo: 'rif' } as never, res as never),
+    ).rejects.toMatchObject({ status: 400 });
+    const once = Array.from({ length: MAX_ARCHIVOS_LOTE + 1 }, (_, i) => multer(PDF, `${i}.pdf`));
+    await expect(
+      ctrl.subir(t, once, { items: JSON.stringify(once.map(() => ({ tipo: 'rif' }))) } as never, res as never),
+    ).rejects.toMatchObject({ status: 400, message: 'Máximo 10 archivos por envío.' });
+    await expect(ctrl.subir(t, [multer(PDF, 'a.pdf', 'foto')], { tipo: 'rif' }, res as never)).rejects.toMatchObject({ status: 400 });
+    expect(nexus.subir).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+
+    const sin = controlador({ configurado: false });
+    const loteDos = { items: JSON.stringify([{ tipo: 'rif' }, { tipo: 'rif' }]) } as never;
+    await expect(sin.ctrl.subir(sin.t, dos, loteDos, sin.res as never)).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('DTO: con items el tipo suelto no es obligatorio', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    const meta = { type: 'body' as const, metatype: SubirDocumentoFlotaDto };
+    await expect(pipe.transform({ items: JSON.stringify([{ tipo: 'rif' }]) }, meta)).resolves.toBeDefined();
+    await expect(pipe.transform({}, meta)).rejects.toThrow();
   });
 });

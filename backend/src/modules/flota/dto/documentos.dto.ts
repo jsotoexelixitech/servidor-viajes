@@ -1,13 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength, ValidateIf } from 'class-validator';
 import { TIPOS_DOCUMENTO_FLOTA, TipoDocumentoFlota } from '../flota-documentos.service';
 
 /**
- * Campos de texto del multipart de POST /api/flota/documentos (el archivo va en `archivo` o `file`).
- * Campos no documentados → 400.
+ * Campos de texto del multipart de POST /api/flota/documentos (el archivo va en `archivo` o `file`;
+ * varios archivos: `archivos` o `archivo` repetido + `items`). Campos no documentados → 400.
  */
 export class SubirDocumentoFlotaDto {
-  @ApiProperty({ enum: TIPOS_DOCUMENTO_FLOTA, example: 'cedula', description: 'rif = RIF de la empresa; cedula / pasaporte = del conductor.' })
+  @ApiProperty({ enum: TIPOS_DOCUMENTO_FLOTA, example: 'cedula', description: 'rif = RIF de la empresa; cedula / pasaporte = del conductor. Un solo documento (en lote va en items).' })
+  @ValidateIf((o: SubirDocumentoFlotaDto) => o.items === undefined)
   @IsIn(TIPOS_DOCUMENTO_FLOTA as unknown as string[], { message: 'tipo inválido. Use: rif, cedula, pasaporte.' })
   tipo: TipoDocumentoFlota;
 
@@ -18,4 +19,11 @@ export class SubirDocumentoFlotaDto {
   @ApiPropertyOptional({ example: '0b6f1f0e-1c2d-4e5f-8a9b-0c1d2e3f4a5b', description: 'Id del certificado del conductor (GET /api/flota/certificados).' })
   @IsOptional() @IsUUID()
   certificadoId?: string;
+
+  @ApiPropertyOptional({
+    example: '[{"tipo":"rif"},{"tipo":"cedula","conductorDoc":"V-12345678"}]',
+    description: 'Varios documentos: JSON array { tipo, conductorDoc?, certificadoId? } alineado por orden con los archivos.',
+  })
+  @IsOptional() @IsString()
+  items?: string;
 }
