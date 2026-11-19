@@ -122,8 +122,9 @@ if ! grep -q '^TENANT_TOKEN_SECRET=.' "$ENVF"; then
   fi
 fi
 ensure_env NEXUS_API_URL http://127.0.0.1:3092
-# QA: la API se publica detrás de /trayecto/ en Apache (nexusqa) → el servicio atiende /trayecto/api y la pantalla en /trayecto/.
-if grep -q '^APP_PREFIX=' "$ENVF"; then sed -i 's#^APP_PREFIX=.*#APP_PREFIX=trayecto/api#' "$ENVF"; else echo 'APP_PREFIX=trayecto/api' >> "$ENVF"; fi
+# QA: Apache publica el servicio en nexusqa.exelixitech.com/trayecto/ quitando el prefijo → la API queda en /api.
+# (APP_PREFIX=trayecto/api solo si el proxy enviara la ruta con el prefijo.)
+if grep -q '^APP_PREFIX=' "$ENVF"; then sed -i 's#^APP_PREFIX=.*#APP_PREFIX=api#' "$ENVF"; else echo 'APP_PREFIX=api' >> "$ENVF"; fi
 # Documentos del expediente (Trayecto Seguro) → nexus-api del 121; la clave interna se copia sin mostrarla.
 ensure_env FLOTA_EXPEDIENTES_URL http://127.0.0.1:3092
 if ! grep -q '^FLOTA_EXPEDIENTES_KEY=.' "$ENVF"; then
