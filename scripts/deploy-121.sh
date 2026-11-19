@@ -122,6 +122,8 @@ if ! grep -q '^TENANT_TOKEN_SECRET=.' "$ENVF"; then
   fi
 fi
 ensure_env NEXUS_API_URL http://127.0.0.1:3092
+# QA: la API se publica detrás de /trayecto/ en Apache (nexusqa) → el servicio atiende /trayecto/api y la pantalla en /trayecto/.
+if grep -q '^APP_PREFIX=' "$ENVF"; then sed -i 's#^APP_PREFIX=.*#APP_PREFIX=trayecto/api#' "$ENVF"; else echo 'APP_PREFIX=trayecto/api' >> "$ENVF"; fi
 # Documentos del expediente (Trayecto Seguro) → nexus-api del 121; la clave interna se copia sin mostrarla.
 ensure_env FLOTA_EXPEDIENTES_URL http://127.0.0.1:3092
 if ! grep -q '^FLOTA_EXPEDIENTES_KEY=.' "$ENVF"; then
@@ -172,11 +174,11 @@ pkill -f "$ROOT/backend/dist/main.js" > /dev/null 2>&1 || true
 pm2 start dist/main.js --name "$APP" --time --max-restarts 5 --exp-backoff-restart-delay 2000
 pm2 save > /dev/null
 
-echo "▶ Salud: http://127.0.0.1:$PORT/api/health (espera hasta 40 s)"
+echo "▶ Salud: http://127.0.0.1:$PORT/${APP_PREFIX:-api}/health (espera hasta 40 s)"
 CODE=000
 for i in $(seq 1 20); do
   sleep 2
-  CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/health" || true)
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/${APP_PREFIX:-api}/health" || true)
   [ "$CODE" = "000" ] || break
 done
 echo "  HTTP $CODE"
@@ -185,4 +187,4 @@ if [ "$CODE" = "000" ]; then
   echo "  ✖ No responde; lo detuve para no consumir CPU. Ver: pm2 logs $APP --lines 60 --nostream"
   exit 1
 fi
-echo "✔ Local: http://127.0.0.1:$PORT/api/health · pública: la ruta que configure infraestructura"
+echo "✔ Local: http://127.0.0.1:$PORT/${APP_PREFIX:-api}/health · pública: la ruta que configure infraestructura"

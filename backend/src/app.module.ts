@@ -29,6 +29,10 @@ import { RedisModule } from './common/redis/redis.module';
 import { SessionModule } from './common/session/session.module';
 import { EnvValidatorService } from './common/env-validator.service';
 
+/** Prefijo de la API (APP_PREFIX, por defecto 'api') y raíz web derivada: 'trayecto/api' → '/trayecto'. */
+const API_PREFIX = (process.env.APP_PREFIX || 'api').replace(/^\/+|\/+$/g, '');
+const WEB_ROOT = API_PREFIX.includes('/') ? `/${API_PREFIX.split('/').slice(0, -1).join('/')}` : undefined;
+
 @Module({
   imports: [
     // Config global
@@ -106,8 +110,10 @@ import { EnvValidatorService } from './common/env-validator.service';
       ? [
           ServeStaticModule.forRoot({
             rootPath: join(__dirname, '..', '..', 'frontend', 'dist'),
-            // Excluir rutas de la API del static serving
-            exclude: ['/api/(.*)', '/api/docs(.*)'],
+            // Con APP_PREFIX=trayecto/api (QA 121, detrás de /trayecto/ en Apache) la pantalla se sirve en /trayecto/
+            ...(WEB_ROOT ? { serveRoot: WEB_ROOT } : {}),
+            // Excluir rutas de la API del static serving (siguen al prefijo configurado)
+            exclude: [`/${API_PREFIX}/(.*)`, `/${API_PREFIX}/docs(.*)`],
             serveStaticOptions: {
               fallthrough: true,
             },

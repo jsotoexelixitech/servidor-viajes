@@ -25,7 +25,7 @@ export default () => {
   app: {
     nodeEnv: process.env.NODE_ENV || 'development',
     port: parseInt(process.env.PORT, 10) || 3000,
-    prefix: process.env.APP_PREFIX || 'api',
+    prefix: (process.env.APP_PREFIX || 'api').replace(/^\/+|\/+$/g, ''),
     corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173').split(','),
   },
   security: {
