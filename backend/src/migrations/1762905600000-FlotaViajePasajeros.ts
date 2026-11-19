@@ -6,6 +6,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   fechaNacimiento, esConductor). NULL en los viajes anteriores y en los simulados.
  *
  * Aditiva e idempotente (IF NOT EXISTS). Respeta DB_SCHEMA (ej. 'flota').
+ * IF EXISTS: en una BD nueva las migraciones corren antes que synchronize, que crea la tabla ya con la columna.
  */
 export class FlotaViajePasajeros1762905600000 implements MigrationInterface {
   name = 'FlotaViajePasajeros1762905600000';
@@ -16,10 +17,10 @@ export class FlotaViajePasajeros1762905600000 implements MigrationInterface {
   }
 
   public async up(q: QueryRunner): Promise<void> {
-    await q.query(`ALTER TABLE ${this.s(q)}"flota_viajes" ADD COLUMN IF NOT EXISTS "pasajeros" jsonb`);
+    await q.query(`ALTER TABLE IF EXISTS ${this.s(q)}"flota_viajes" ADD COLUMN IF NOT EXISTS "pasajeros" jsonb`);
   }
 
   public async down(q: QueryRunner): Promise<void> {
-    await q.query(`ALTER TABLE ${this.s(q)}"flota_viajes" DROP COLUMN IF EXISTS "pasajeros"`);
+    await q.query(`ALTER TABLE IF EXISTS ${this.s(q)}"flota_viajes" DROP COLUMN IF EXISTS "pasajeros"`);
   }
 }
